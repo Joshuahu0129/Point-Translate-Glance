@@ -9,7 +9,7 @@ import os
 import sys
 
 APP_NAME = "Glance"
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 AUTHOR = "Joshua Hu"
 AUTHOR_TIP = "Made by Joshua Hu"
 VERSION_LINE = "Version %s · by %s" % (VERSION, AUTHOR)
@@ -34,13 +34,13 @@ DEFAULT = {
     # Full sentences always use the online translator either way.
     "translate_source": "local",
     # Size (physical pixels) of the screen area grabbed around the cursor.
-    # Wider = more sentence context, slightly slower OCR.
-    "capture_width": 1000,
-    "capture_height": 68,
+    # Wider / taller = full wrapped sentences, slightly slower OCR.
+    "capture_width": 1400,
+    "capture_height": 120,
     # UI theme: "light" | "dark"
     "theme": "dark",
-    # Width of the popup card content area, px.
-    "card_width": 380,
+    # Width of the popup card content area, px (grows if the headline needs it).
+    "card_width": 400,
     # Base font size of the popup.
     "font_size": 12,
     # Popup opacity, 0.85 - 1.0 (1.0 = fully opaque).
@@ -78,9 +78,24 @@ def load():
                 cfg.update(user)
         except Exception as e:  # noqa: BLE001 - keep running with defaults
             print("config.json 读取失败, 使用默认配置:", e)
+        if _migrate(cfg):
+            save(cfg)
     else:
         save(cfg)
     return cfg
+
+
+def _migrate(cfg):
+    """Bring an older config.json forward. Returns True if it changed."""
+    changed = False
+    # 1.0.2: capture area widened for full wrapped sentences
+    if int(cfg.get("capture_width", 0)) < 1200:
+        cfg["capture_width"] = DEFAULT["capture_width"]
+        changed = True
+    if int(cfg.get("capture_height", 0)) < 100:
+        cfg["capture_height"] = DEFAULT["capture_height"]
+        changed = True
+    return changed
 
 
 def save(cfg):

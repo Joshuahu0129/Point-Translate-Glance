@@ -131,6 +131,49 @@ def _parse_translation(text):
             for lbl in sorted(order, key=rank)]
 
 
+_LEMMA_HINT = re.compile(r"[（(]\s*([a-zA-Z][a-zA-Z\-]+?)\s*的")
+
+
+def _deinflect(w):
+    w = w.lower()
+    out = []
+    if len(w) > 4 and w.endswith("ies"):
+        out.append(w[:-3] + "y")
+    if len(w) > 3 and w.endswith("es"):
+        out.append(w[:-2])
+    if len(w) > 2 and w.endswith("s"):
+        out.append(w[:-1])
+    if len(w) > 4 and w.endswith("ied"):
+        out.append(w[:-3] + "y")
+    if len(w) > 3 and w.endswith("ed"):
+        out += [w[:-2], w[:-1]]
+        if len(w) > 5 and w[-3] == w[-4]:
+            out.append(w[:-3])
+    if len(w) > 4 and w.endswith("ing"):
+        out += [w[:-3], w[:-3] + "e"]
+        if len(w) > 5 and w[-4] == w[-5]:
+            out.append(w[:-4])
+    if len(w) > 4 and w.endswith(("er", "st")):
+        out += [w[:-2], w[:-1], w[:-3]]
+    seen = []
+    for c in out:
+        if c and c != w and c not in seen:
+            seen.append(c)
+    return seen
+
+
+def _fetch(conn, word):
+    return conn.execute(
+        "SELECT word, phonetic, translation FROM words WHERE word = ?",
+        (word,),
+    ).fetchone()
+
+
+def _phonetic_of(conn, word):
+    r = conn.execute("SELECT phonetic FROM words WHERE word = ?", (word,)).fetchone()
+    return (r[0] or "").strip() if r else ""
+
+
 def lookup(word):
     if not word:
         return None
@@ -139,18 +182,26 @@ def lookup(word):
         return None
     key = word.strip().lower()
     with _lock:
-        row = conn.execute(
-            "SELECT word, phonetic, translation FROM words WHERE word = ?",
-            (key,),
-        ).fetchone()
+        row = _fetch(conn, key)
         if row is None and key != word.strip():
-            row = conn.execute(
-                "SELECT word, phonetic, translation FROM words WHERE word = ?",
-                (word.strip(),),
-            ).fetchone()
-    if row is None:
-        return None
-    entry = Entry(row[0] or word, row[1], row[2])
-    if not entry.pos_groups:
-        return None
+            row = _fetch(conn, word.strip())
+        if row is None:
+            return None
+        entry = Entry(row[0] or word, row[1], row[2])
+        if not entry.pos_groups:
+            return None
+        # inflected forms (safeguards, studies, running) often lack a phonetic
+        # in ECDICT -> borrow it from the base form.
+        if not entry.phonetic:
+            cands = []
+            m = _LEMMA_HINT.search(entry.translation)
+            if m:
+                cands.append(m.group(1).lower())
+            cands += _deinflect(key)
+            for b in cands:
+                ph = _phonetic_of(conn, b)
+                if ph:
+                    entry.phonetic = (ph.strip("/").replace("'", "ˈ")
+                                      .replace(",", "ˌ").replace(":", "ː"))
+                    break
     return entry

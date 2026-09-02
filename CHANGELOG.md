@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-09-02
+
+### 修复
+- **取词只取到半句**:截取区域加大到 1400×120,并新增跨行拼句逻辑
+  (`assemble_sentence`)——把换行折行的同一句话拼完整,遇到句号 / 菜单栏 /
+  相邻段落自动停下。老配置会在启动时自动升级截取尺寸。
+- **音标丢失**:`safeguards` / `studies` 这类变形词 ECDICT 里没有音标 ——
+  现在会自动回退到原形(`safeguard` / `study`)借用音标。
+- 卡片会随标题(单词 + 长音标)需要自动变宽。
+
+### 变更
+- 去掉"常用释义"字样,省一行高度。
+- 例句中文翻译改用粗体,不再显得太淡。
+- 词性标签(n. / adj.)在释义换行时顶端对齐第一行,不再垂直居中。
+- **钉住后内容冻结**:钉住时不再随鼠标刷新翻译,内容保持不动;钉住后可拖动窗口。
+
 ## [1.0.1] - 2026-09-02
 
 ### 变更
@@ -40,10 +56,10 @@
 
 ### 已知限制
 - 译文侧高亮是启发式匹配,机器翻译换用同义词时会匹配不到(英文侧不受影响)。
-- "整句" = OCR 识别到的同一行,跨行长句不合并。
 - 圆角用 Win32 窗口区域实现,Windows 10 上无原生投影阴影。
 - 依赖 Windows 英文 OCR 语言包(首次运行会提示安装)。
 
-[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/releases/tag/v1.0.0

@@ -22,7 +22,7 @@ LIGHT = {
     "accent": "#0A84FF", "primary": "#0A6CE0",
     "chip_bg": "#EEEEF1", "chip_fg": "#2E2E33",
     "pos_bg": "#E4EFFE", "pos_fg": "#0A63D6",
-    "sent": "#3C3C43", "sent_dim": "#5C5C63",
+    "sent": "#3C3C43", "sent_dim": "#3A3A40",
     "icon": "#5A5A60", "icon_hi": "#1D1D1F",
     "icon_bg": "#EDEDF0", "icon_hover_bg": "#DEDEE3",
     "sep": "#EEEEF1", "name": "#B8B8BE",
@@ -33,7 +33,7 @@ DARK = {
     "accent": "#0A84FF", "primary": "#4C9EFF",
     "chip_bg": "#3A3A3E", "chip_fg": "#E6E6EA",
     "pos_bg": "#123A63", "pos_fg": "#7ABBFF",
-    "sent": "#D6D6DB", "sent_dim": "#A6A6AC",
+    "sent": "#D6D6DB", "sent_dim": "#CDCDD3",
     "icon": "#BFBFC5", "icon_hi": "#FFFFFF",
     "icon_bg": "#333338", "icon_hover_bg": "#454549",
     "sep": "#333336", "name": "#6E6E73",
@@ -55,11 +55,12 @@ def _root_hwnd(win):
 
 
 class Popup:
-    def __init__(self, root, cfg, on_speak=None, on_unpin=None):
+    def __init__(self, root, cfg, on_speak=None, on_unpin=None, on_pin=None):
         self.root = root
         self.cfg = cfg
         self.on_speak = on_speak or (lambda w: None)
         self.on_unpin = on_unpin or (lambda: None)
+        self.on_pin = on_pin or (lambda pinned: None)
         self.pal = DARK if str(cfg.get("theme", "light")).lower() == "dark" else LIGHT
         self.radius = int(cfg.get("corner_radius", 16))
         self.pinned = False
@@ -77,7 +78,8 @@ class Popup:
         self.f_chip = tkfont.Font(family=cjk, size=fs - 3)
         self.f_pos = tkfont.Font(family="Segoe UI Semibold", size=fs - 3, weight="bold")
         self.f_sent = tkfont.Font(family="Segoe UI", size=fs - 1)
-        self.f_sent_cn = tkfont.Font(family=cjk, size=fs - 2)
+        # the Chinese sentence translation reads too faint at regular weight
+        self.f_sent_cn = tkfont.Font(family=cjk, size=fs - 2, weight="bold")
         self.f_sent_b = tkfont.Font(family="Segoe UI Semibold", size=fs - 1, weight="bold")
         self.f_sent_cn_b = tkfont.Font(family=cjk, size=fs - 2, weight="bold")
         self.f_icon = tkfont.Font(family="Segoe MDL2 Assets", size=fs + 3)
@@ -195,7 +197,8 @@ class Popup:
             row = tk.Frame(self.groups, bg=p["card"])
             row.pack(fill="x", pady=(3, 0), anchor="w")
             tk.Label(row, text=" %s " % label, bg=p["pos_bg"], fg=p["pos_fg"],
-                     font=self.f_pos, padx=3, pady=1).pack(side="left")
+                     font=self.f_pos, padx=3, pady=1).pack(side="left", anchor="n",
+                                                           pady=(1, 0))
             box = tk.Frame(row, bg=p["card"])
             box.pack(side="left", padx=(6, 0))
             line = tk.Frame(box, bg=p["card"])
@@ -242,9 +245,8 @@ class Popup:
 
         primary = data.get("primary") or ""
         if primary:
-            self.l_section.pack(fill="x", pady=(10, 0))
             self.l_primary.config(text=primary)
-            self.l_primary.pack(fill="x", pady=(1, 0))
+            self.l_primary.pack(fill="x", pady=(9, 0))
 
         groups = data.get("pos_groups") or []
         if groups:
@@ -329,6 +331,7 @@ class Popup:
     def _toggle_pin(self, _=None):
         self.pinned = not self.pinned
         self._sync_pin()
+        self.on_pin(self.pinned)
         if not self.pinned:
             self.on_unpin()
             self.win.withdraw()

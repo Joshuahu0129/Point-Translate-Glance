@@ -63,19 +63,27 @@ def hotkey_keys():
 job_q = queue.Queue()
 result_q = queue.Queue()
 _lock = threading.Lock()
-_state = {"held": False, "gen": 0, "last_move": 0.0, "released_at": 0.0}
+_state = {"held": False, "gen": 0, "last_move": 0.0, "released_at": 0.0,
+          "pinned": False}
 
 mouse_ctl = mouse.Controller()
 _PUNCT = "".join(set(string.punctuation) | {"“", "”", "‘", "’", "—", "…", "·", "，", "。"})
 
 
 # --- input --------------------------------------------------------------
+def set_pinned(pinned):
+    with _lock:
+        _state["pinned"] = bool(pinned)
+
+
 def request_translation():
     try:
         x, y = mouse_ctl.position
     except Exception:
         return
     with _lock:
+        if _state["pinned"]:          # frozen while pinned
+            return
         _state["gen"] += 1
         gen = _state["gen"]
         held = _state["held"]
@@ -140,7 +148,68 @@ def pick_word(lines, cx, cy):
         return None, None
     if best_d > 0 and best_d > (max(best["h"], 24) * 2.5) ** 2:
         return None, None
-    return clean_word(best["text"]), (best_line["text"] if best_line else None)
+    return clean_word(best["text"]), best_line
+
+
+_SENT_END = re.compile(r"[.!?。！？…][\"'”’)\]]*\s*$")
+
+
+def _l_top(ln):
+    return min((w["y"] for w in ln["words"]), default=0)
+
+
+def _l_bot(ln):
+    return max((w["y"] + w["h"] for w in ln["words"]), default=0)
+
+
+def _is_prose(text):
+    t = (text or "").strip()
+    if len(t.split()) < 2 or len(t) < 6:
+        return False
+    good = sum(c.isalpha() or c.isspace() or c in ",.;:'\"-" for c in t)
+    return good >= 0.75 * len(t)
+
+
+def assemble_sentence(lines, cur_line, word):
+    """Join the OCR lines that make up the sentence the word sits in - handles
+    text that wraps across visual lines. Stops at menu bars / other paragraphs
+    by requiring tight line spacing and prose-looking neighbours."""
+    if not cur_line or not cur_line["words"]:
+        return None
+    ordered = sorted((l for l in lines if l["words"]), key=_l_top)
+    try:
+        i = ordered.index(cur_line)
+    except ValueError:
+        return cur_line["text"].strip()
+    hs = sorted(w["h"] for l in ordered for w in l["words"])
+    lh = hs[len(hs) // 2] if hs else 20
+
+    def adjacent(a, b):  # b sits directly under a, normal line spacing
+        return 0 <= _l_top(b) - _l_bot(a) <= lh * 0.8
+
+    parts = [cur_line["text"].strip()]
+    j = i - 1
+    while j >= 0 and _is_prose(ordered[j]["text"]) \
+            and not _SENT_END.search(ordered[j]["text"]) \
+            and adjacent(ordered[j], ordered[j + 1]):
+        parts.insert(0, ordered[j]["text"].strip())
+        if len(" ".join(parts)) > 340:
+            break
+        j -= 1
+    k = i + 1
+    while k < len(ordered) and not _SENT_END.search(" ".join(parts)) \
+            and _is_prose(ordered[k]["text"]) \
+            and adjacent(ordered[k - 1], ordered[k]):
+        parts.append(ordered[k]["text"].strip())
+        if len(" ".join(parts)) > 340:
+            break
+        k += 1
+
+    joined = re.sub(r"\s+", " ", " ".join(parts)).strip()
+    for s in re.split(r"(?<=[.!?。！？])\s+", joined):
+        if re.search(r"(?i)\b%s\b" % re.escape(word), s):
+            return s.strip()
+    return joined
 
 
 # --- CN alignment heuristic -----------------------------------------
@@ -216,9 +285,10 @@ def do_lookup(sct, x, y):
     shot = sct.grab({"left": left, "top": top, "width": w, "height": h})
     png = mss.tools.to_png(shot.rgb, shot.size)
     lines = ocr_png_bytes(png, CFG.get("ocr_language", "en-US"))
-    word, sentence = pick_word(lines, x - left, y - top)
+    word, cur_line = pick_word(lines, x - left, y - top)
     if not word or not re.search(r"[A-Za-z]", word):
         return None
+    sentence = assemble_sentence(lines, cur_line, word)
 
     order = tuple(CFG.get("engine_order", ["google", "mymemory"]))
     tl = CFG.get("target_language", "zh-CN")
@@ -280,6 +350,8 @@ def _active(popup):
 
 def poll(root, holder):
     popup = holder["popup"]
+    with _lock:
+        _state["pinned"] = popup.pinned
     try:
         while True:
             kind, gen, anchor, payload = result_q.get_nowait()
@@ -330,7 +402,7 @@ def make_tray(root, holder):
 
     def rebuild_popup():
         holder["popup"].win.destroy()
-        holder["popup"] = Popup(root, CFG, on_speak=tts.speak)
+        holder["popup"] = Popup(root, CFG, on_speak=tts.speak, on_pin=set_pinned)
 
     def toggle_theme(icon, item):
         CFG["theme"] = "light" if CFG.get("theme") == "dark" else "dark"
@@ -401,7 +473,7 @@ def main():
     except Exception:
         pass
 
-    holder = {"popup": Popup(root, CFG, on_speak=tts.speak)}
+    holder = {"popup": Popup(root, CFG, on_speak=tts.speak, on_pin=set_pinned)}
 
     if not ocr_available(CFG.get("ocr_language", "en-US")):
         from tkinter import messagebox
