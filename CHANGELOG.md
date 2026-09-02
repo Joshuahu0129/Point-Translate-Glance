@@ -7,7 +7,17 @@
 
 ## [Unreleased]
 
-## [1.0.2] - 2026-09-02
+## [1.0.3] - 2026-09-02
+
+### 新增
+- **已选中文字优先**:取词时如果已经框选了一段文字,翻译的"句子"就用选区,
+  不再用 OCR 拼句。背后用一次快速 Ctrl+C 读取选区(与截图/OCR 并行,不加延迟)。
+  可在 `config.json` 用 `use_selection` 关闭。
+
+### 变更
+- 钉子 / 喇叭图标加重(字号变大、按钮尺寸不变);图标底色、词性标签、释义
+  胶囊统一改成小圆角。
+- "查询中"文字换成三个跳动的小圆点动画。
 
 ### 修复
 - **取词只取到半句**:截取区域加大到 1400×120,并新增跨行拼句逻辑
@@ -59,7 +69,8 @@
 - 圆角用 Win32 窗口区域实现,Windows 10 上无原生投影阴影。
 - 依赖 Windows 英文 OCR 语言包(首次运行会提示安装)。
 
-[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/releases/tag/v1.0.0

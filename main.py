@@ -46,6 +46,99 @@ from ocr import ocr_available, ocr_png_bytes
 from popup import Popup
 from translate import TranslateError, translate
 
+_kbd = keyboard.Controller()
+
+# --- reading the current text selection (via a quick clipboard round-trip) ---
+_CF_UNICODETEXT = 13
+_GMEM_MOVEABLE = 0x0002
+_u32 = ctypes.windll.user32
+_k32 = ctypes.windll.kernel32
+_k32.GlobalLock.restype = ctypes.c_void_p
+_k32.GlobalLock.argtypes = [ctypes.c_void_p]
+_k32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+_k32.GlobalAlloc.restype = ctypes.c_void_p
+_k32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+_u32.GetClipboardData.restype = ctypes.c_void_p
+_u32.GetClipboardData.argtypes = [ctypes.c_uint]
+_u32.SetClipboardData.restype = ctypes.c_void_p
+_u32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+
+_SENTINEL = "\x00glance-probe\x00"
+
+
+def _open_clipboard():
+    for _ in range(6):
+        if _u32.OpenClipboard(0):
+            return True
+        time.sleep(0.01)
+    return False
+
+
+def _clip_get():
+    if not _open_clipboard():
+        return None
+    try:
+        h = _u32.GetClipboardData(_CF_UNICODETEXT)
+        if not h:
+            return None
+        p = _k32.GlobalLock(h)
+        try:
+            return ctypes.c_wchar_p(p).value if p else None
+        finally:
+            _k32.GlobalUnlock(h)
+    finally:
+        _u32.CloseClipboard()
+
+
+def _clip_set(text):
+    if not _open_clipboard():
+        return
+    try:
+        _u32.EmptyClipboard()
+        if text:
+            buf = ctypes.create_unicode_buffer(text)
+            size = ctypes.sizeof(buf)
+            h = _k32.GlobalAlloc(_GMEM_MOVEABLE, size)
+            dst = _k32.GlobalLock(h)
+            ctypes.memmove(dst, buf, size)
+            _k32.GlobalUnlock(h)
+            _u32.SetClipboardData(_CF_UNICODETEXT, h)
+    finally:
+        _u32.CloseClipboard()
+
+
+def _selection_probe_begin():
+    """Drop a sentinel on the clipboard and fire a copy; the copy lands while
+    the screenshot + OCR run. Returns the saved clipboard text (or None)."""
+    if not CFG.get("use_selection", True):
+        return False
+    if str(CFG.get("hotkey", "ctrl")).lower() != "ctrl":
+        return False
+    try:
+        saved = _clip_get()
+        _clip_set(_SENTINEL)
+        _kbd.press("c")
+        _kbd.release("c")
+        return saved if saved is not None else ""
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _selection_probe_end(saved):
+    if saved is False:
+        return ""
+    try:
+        time.sleep(0.02)
+        cur = _clip_get()
+        _clip_set(saved or "")
+        if cur and cur != _SENTINEL and cur.strip():
+            t = re.sub(r"\s+", " ", cur).strip()
+            if 2 <= len(t) <= 400 and re.search(r"[A-Za-z]", t):
+                return t
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
 CFG = cfg_mod.load()
 
 HOTKEY_MAP = {
@@ -282,13 +375,29 @@ def do_lookup(sct, x, y):
     vx, vy, vw, vh = _vscreen()
     left = max(vx, min(x - w // 2, vx + vw - w))
     top = max(vy, min(y - h // 2, vy + vh - h))
+
+    # fire a copy for any active selection; it lands while OCR runs
+    _sel_saved = _selection_probe_begin()
+
     shot = sct.grab({"left": left, "top": top, "width": w, "height": h})
     png = mss.tools.to_png(shot.rgb, shot.size)
     lines = ocr_png_bytes(png, CFG.get("ocr_language", "en-US"))
     word, cur_line = pick_word(lines, x - left, y - top)
+
+    selection = _selection_probe_end(_sel_saved)
+
     if not word or not re.search(r"[A-Za-z]", word):
-        return None
-    sentence = assemble_sentence(lines, cur_line, word)
+        # nothing under the cursor, but a phrase is selected -> translate it
+        if selection:
+            word = re.split(r"\s+", re.sub(r"[^A-Za-z\s'-]", " ", selection).strip())[0]
+        if not word or not re.search(r"[A-Za-z]", word):
+            return None
+        cur_line = None
+
+    if selection:
+        sentence = selection
+    else:
+        sentence = assemble_sentence(lines, cur_line, word)
 
     order = tuple(CFG.get("engine_order", ["google", "mymemory"]))
     tl = CFG.get("target_language", "zh-CN")

@@ -9,7 +9,7 @@ import os
 import sys
 
 APP_NAME = "Glance"
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 AUTHOR = "Joshua Hu"
 AUTHOR_TIP = "Made by Joshua Hu"
 VERSION_LINE = "Version %s · by %s" % (VERSION, AUTHOR)
@@ -54,6 +54,10 @@ DEFAULT = {
     "linger_ms": 500,
     # Also speak the word automatically when the popup shows.
     "auto_speak": False,
+    # If text is already selected when you trigger a lookup, translate the
+    # selection as the sentence. Uses a quick Ctrl+C behind the scenes; turn
+    # off if it interferes with an app that copies on empty selection.
+    "use_selection": True,
 }
 
 

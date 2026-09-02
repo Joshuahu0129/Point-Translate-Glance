@@ -5,11 +5,23 @@ transparent-colour fringe.  Everything else is plain Tkinter.
 """
 
 import ctypes
+import math
 import re
 import tkinter as tk
 import tkinter.font as tkfont
 
+try:
+    from PIL import Image, ImageDraw, ImageTk
+    _PIL = True
+except Exception:  # noqa: BLE001
+    _PIL = False
+
 from config import APP_NAME, AUTHOR_TIP
+
+
+def _rgba(hex_color):
+    h = hex_color.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
 
 # Segoe MDL2 Assets glyphs (present on Windows 10/11)
 IC_PIN = "\uE718"     # Pin
@@ -66,6 +78,10 @@ class Popup:
         self.pinned = False
         self._word = ""
         self._drag = None
+        self._imgs = {}          # rounded-rect PhotoImage cache
+        self._imgrefs = []       # keep per-chip images alive
+        self._anim_job = None
+        self._anim_t = 0
 
         fs = int(cfg.get("font_size", 12))
         cjk = "Microsoft YaHei UI"
@@ -82,7 +98,8 @@ class Popup:
         self.f_sent_cn = tkfont.Font(family=cjk, size=fs - 2, weight="bold")
         self.f_sent_b = tkfont.Font(family="Segoe UI Semibold", size=fs - 1, weight="bold")
         self.f_sent_cn_b = tkfont.Font(family=cjk, size=fs - 2, weight="bold")
-        self.f_icon = tkfont.Font(family="Segoe MDL2 Assets", size=fs + 3)
+        # bigger glyph inside a fixed-size button = heavier look, same footprint
+        self.f_icon = tkfont.Font(family="Segoe MDL2 Assets", size=fs + 6)
         self.f_name = tkfont.Font(family="Segoe UI", size=fs - 4)
 
         self.content_w = max(300, int(cfg.get("card_width", 380)))
@@ -138,24 +155,97 @@ class Popup:
         self.l_phon = tk.Label(self.l_word_wrap, bg=p["card"], fg=p["phon"],
                                font=self.f_phon)
         self.l_phon.pack(side="left", padx=(8, 0), pady=(6, 0))
+        self.loader = tk.Canvas(self.l_word_wrap, width=48,
+                                height=self.f_word.metrics("linespace"),
+                                bg=p["card"], highlightthickness=0)
 
-        # right-side controls: speaker + pin, sitting in a weighted chip
+        # right-side controls: speaker + pin, in rounded weighted chips
         tools = tk.Frame(self.header, bg=p["card"])
         tools.pack(side="right", pady=(2, 0))
-        self.b_pin = self._icon_btn(tools, IC_PIN, self._toggle_pin)
         self.b_speak = self._icon_btn(tools, IC_SPEAK,
                                       lambda e: self.on_speak(self._word))
-        self.b_speak.pack(side="left", padx=(0, 4))
+        self.b_pin = self._icon_btn(tools, IC_PIN, self._toggle_pin)
+        self.b_speak.pack(side="left", padx=(0, 5))
         self.b_pin.pack(side="left")
+
+    # ---- rounded backgrounds ---------------------------------------
+    def _round_img(self, w, h, radius, fill_hex):
+        key = (w, h, radius, fill_hex)
+        img = self._imgs.get(key)
+        if img is None and _PIL:
+            s = 4
+            im = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0))
+            ImageDraw.Draw(im).rounded_rectangle(
+                [0, 0, w * s - 1, h * s - 1], radius=radius * s,
+                fill=_rgba(fill_hex))
+            im = im.resize((w, h), Image.LANCZOS)
+            img = ImageTk.PhotoImage(im)
+            self._imgs[key] = img
+        return img
+
+    def _chip(self, parent, text, font, fg, bg_hex, px, py, radius):
+        w = font.measure(text) + px * 2
+        h = font.metrics("linespace") + py * 2
+        img = self._round_img(w, h, radius, bg_hex)
+        if img is None:
+            return tk.Label(parent, text=text, font=font, fg=fg, bg=bg_hex,
+                            padx=px, pady=py)
+        lbl = tk.Label(parent, text=text, font=font, fg=fg, bg=self.pal["card"],
+                       image=img, compound="center", width=w, height=h,
+                       borderwidth=0)
+        lbl._img = img
+        self._imgrefs.append(img)
+        return lbl
 
     def _icon_btn(self, parent, glyph, cb):
         p = self.pal
-        b = tk.Label(parent, text=glyph, font=self.f_icon, bg=p["icon_bg"],
-                     fg=p["icon"], padx=8, pady=5, cursor="hand2")
-        b.bind("<Enter>", lambda e: b.config(bg=p["icon_hover_bg"], fg=p["icon_hi"]))
-        b.bind("<Leave>", lambda e: b.config(bg=p["icon_bg"], fg=p["icon"]))
+        W, H, R = 34, 28, 7
+        base = self._round_img(W, H, R, p["icon_bg"])
+        hot = self._round_img(W, H, R, p["icon_hover_bg"])
+        b = tk.Label(parent, text=glyph, font=self.f_icon, fg=p["icon"],
+                     bg=p["card"], cursor="hand2", borderwidth=0)
+        if base is not None:
+            b.config(image=base, compound="center", width=W, height=H)
+            b._imgs = (base, hot)
+            b.bind("<Enter>", lambda e: b.config(image=hot, fg=p["icon_hi"]))
+            b.bind("<Leave>", lambda e: b.config(image=base, fg=p["icon"]))
+        else:
+            b.config(bg=p["icon_bg"], padx=8, pady=5)
+            b.bind("<Enter>", lambda e: b.config(bg=p["icon_hover_bg"], fg=p["icon_hi"]))
+            b.bind("<Leave>", lambda e: b.config(bg=p["icon_bg"], fg=p["icon"]))
         b.bind("<Button-1>", cb)
         return b
+
+    # ---- loading dots --------------------------------------------
+    def _start_anim(self):
+        self._stop_anim()
+        self._anim_t = 0
+        c = self.loader
+        c.delete("all")
+        self._dots = [c.create_oval(0, 0, 0, 0, outline="") for _ in range(3)]
+        self._anim_tick()
+
+    def _stop_anim(self):
+        if self._anim_job:
+            try:
+                self.root.after_cancel(self._anim_job)
+            except Exception:
+                pass
+            self._anim_job = None
+
+    def _anim_tick(self):
+        c = self.loader
+        h = int(c["height"])
+        base, accent = self.pal["phon"], self.pal["accent"]
+        self._anim_t += 1
+        for i, d in enumerate(self._dots):
+            ph = self._anim_t * 0.28 - i * 0.9
+            s = (math.sin(ph) + 1) / 2          # 0..1
+            r = 2.4 + 2.2 * s
+            cx, cy = 9 + i * 14, h / 2
+            c.coords(d, cx - r, cy - r, cx + r, cy + r)
+            c.itemconfig(d, fill=accent if s > 0.55 else base)
+        self._anim_job = self.root.after(60, self._anim_tick)
 
     def _make_text(self, fg, font, font_b):
         p = self.pal
@@ -192,13 +282,13 @@ class Popup:
     def _fill_groups(self, pos_groups):
         for c in self.groups.winfo_children():
             c.destroy()
+        self._imgrefs = []
         p = self.pal
         for label, meanings in pos_groups[:5]:
             row = tk.Frame(self.groups, bg=p["card"])
             row.pack(fill="x", pady=(3, 0), anchor="w")
-            tk.Label(row, text=" %s " % label, bg=p["pos_bg"], fg=p["pos_fg"],
-                     font=self.f_pos, padx=3, pady=1).pack(side="left", anchor="n",
-                                                           pady=(1, 0))
+            self._chip(row, label, self.f_pos, p["pos_fg"], p["pos_bg"],
+                       6, 2, 5).pack(side="left", anchor="n", pady=(1, 0))
             box = tk.Frame(row, bg=p["card"])
             box.pack(side="left", padx=(6, 0))
             line = tk.Frame(box, bg=p["card"])
@@ -206,15 +296,14 @@ class Popup:
             used = 0
             budget = self.content_w - 60
             for m in meanings:
-                w = self.f_chip.measure(m) + 18
+                w = self.f_chip.measure(m) + 20
                 if used and used + w > budget:
                     line = tk.Frame(box, bg=p["card"])
-                    line.pack(anchor="w", pady=(3, 0))
+                    line.pack(anchor="w", pady=(4, 0))
                     used = 0
-                tk.Label(line, text=m, bg=p["chip_bg"], fg=p["chip_fg"],
-                         font=self.f_chip, padx=7, pady=2).pack(side="left",
-                                                                padx=(0, 4))
-                used += w + 4
+                self._chip(line, m, self.f_chip, p["chip_fg"], p["chip_bg"],
+                           8, 3, 5).pack(side="left", padx=(0, 5))
+                used += w + 5
 
     # ---- show --------------------------------------------------
     def _set_sentence(self, widget, text, spans):
@@ -226,10 +315,19 @@ class Popup:
         widget.configure(state="disabled",
                          height=max(1, min(6, self._line_count(widget._font, text))))
 
+    def _show_word_row(self):
+        self._stop_anim()
+        self.loader.pack_forget()
+        if not self.l_word.winfo_ismapped():
+            self.l_word.pack(side="left")
+        if not self.l_phon.winfo_ismapped():
+            self.l_phon.pack(side="left", padx=(8, 0), pady=(6, 0))
+
     def show(self, anchor, data):
         """data: dict(word, phonetic, primary, pos_groups, sentence_en,
                       sentence_cn, spans_en, spans_cn)"""
         p = self.pal
+        self._show_word_row()
         self._word = data.get("word", "")
         self.l_word.config(text=self._word)
         phon = data.get("phonetic") or ""
@@ -270,8 +368,10 @@ class Popup:
 
     def show_loading(self, anchor):
         self._word = ""
-        self.l_word.config(text="查询中")
-        self.l_phon.config(text="")
+        self.l_word.pack_forget()
+        self.l_phon.pack_forget()
+        self.loader.pack(side="left", pady=(4, 0))
+        self._start_anim()
         for w in (self.l_section, self.l_primary, self.groups, self.sep,
                   self.t_en, self.t_cn, self.l_name):
             w.pack_forget()
@@ -279,6 +379,7 @@ class Popup:
         self._apply_region()
 
     def show_message(self, anchor, text):
+        self._show_word_row()
         self._word = ""
         self.l_word.config(text=text)
         self.l_phon.config(text="")
@@ -320,11 +421,13 @@ class Popup:
 
     def hide(self):
         if not self.pinned:
+            self._stop_anim()
             self.win.withdraw()
 
     def force_hide(self):
         self.pinned = False
         self._sync_pin()
+        self._stop_anim()
         self.win.withdraw()
 
     # ---- pin / drag ------------------------------------
