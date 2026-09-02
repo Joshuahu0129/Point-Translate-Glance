@@ -5,19 +5,6 @@
 
 Windows 10/11 · 绿色免安装 · 作者 [Joshua Hu](https://github.com/Joshuahu0129)
 
-![预览](docs/preview.png)
-
----
-
-> ### 安装和使用
-> 到 **[Releases](https://github.com/Joshuahu0129/Point-Translate-Glance/releases)**
-> 下载： **`Glance.exe`** 一个文件,双击就能用
-> 使用：用法和常见问题见 [docs/快速使用说明.md](docs/快速使用说明.md)。
-
----
-
-## 为什么好用
-
 - **全局取词,不挑软件**。浏览器、PDF、Word、聊天窗口、图片、视频字幕……只要
   屏幕上看得到,就能取词。原理是截图 + OCR,不依赖某个程序提供接口。
 - **单词和句子一起翻**。卡片上半部分是这个词的音标和分词性释义,下半部分是它
@@ -27,6 +14,14 @@ Windows 10/11 · 绿色免安装 · 作者 [Joshua Hu](https://github.com/Joshua
 - **不打扰**。默认要按住 Ctrl 才翻译,松开就消失;想留着看就点 📌 钉住。
 - **顺手的小功能**:🔊 朗读、浅色 / 深色主题、开机自启、翻译来源一键切换。
 - **绿色免安装**。一个 exe,双击即用,不写注册表,删掉就没了。
+
+> ### 安装和使用
+> 到 **[Releases](https://github.com/Joshuahu0129/Point-Translate-Glance/releases)**
+> 下载： **`Glance.exe`** 一个文件,双击就能用
+> 使用：用法和常见问题见 [docs/快速使用说明.md](docs/快速使用说明.md)。
+
+![预览](docs/preview.png)
+
 
 ## 快速开始
 
