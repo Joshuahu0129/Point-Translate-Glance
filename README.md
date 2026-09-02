@@ -25,7 +25,7 @@
 ## 快速开始
 
 普通用户:下载 [最新 Release](https://github.com/Joshuahu0129/Point-Translate-Glance/releases)
-里的 `Glance.exe`,双击运行。详见 [快速使用说明](docs/快速使用说明.txt)。
+里的 `Glance.exe`,双击运行。详见 [快速使用说明](docs/快速使用说明.md)。
 
 > 首次运行如提示缺少 OCR 语言包:设置 → 时间和语言 → 语言和区域 → English →
 > 语言选项 → 安装「光学字符识别」,然后重启。
@@ -83,8 +83,8 @@ Mac 版计划见 [docs/PORTING-MAC.md](docs/PORTING-MAC.md)。
 | `theme` | `light` / `dark` | `dark` |
 | `target_language` | 目标语言 | `zh-CN` |
 | `engine_order` | 整句翻译引擎顺序 | `["google","mymemory"]` |
-| `card_width` / `corner_radius` / `font_size` / `opacity` | 卡片外观 | 380 / 16 / 12 / 1.0 |
-| `capture_width` / `capture_height` | 取词截图区域 px | 1000 / 68 |
+| `card_width` / `corner_radius` / `font_size` / `opacity` | 卡片外观 | 400 / 16 / 12 / 1.0 |
+| `capture_width` / `capture_height` | 取词截图区域 px | 1400 / 120 |
 | `debounce_ms` / `linger_ms` | 静止多久查词 / 松键后停留 | 130 / 500 |
 | `auto_speak` | 弹出时自动朗读 | `false` |
 
