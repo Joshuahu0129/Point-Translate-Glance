@@ -1,0 +1,4 @@
+# Extra tooling for building / maintaining Glance (not needed to just run it).
+-r requirements.txt
+pyinstaller>=6.10          # build Glance.exe  (build.bat)
+py7zr>=0.21               # extract ECDICT stardict.7z  (make_dict.py)

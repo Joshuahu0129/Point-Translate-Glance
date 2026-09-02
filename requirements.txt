@@ -1,0 +1,5 @@
+mss>=9.0.1
+pynput>=1.7.6
+winsdk>=1.0.0b10
+pystray>=0.19.5
+Pillow>=10.0.0

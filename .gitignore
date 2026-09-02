@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Dictionary build intermediates (the final glance-dict.db IS committed)
+stardict.7z
+stardict.csv
+ecdict*.csv
+
+# App runtime
+config.json
+
+# Dev scratch
+demo.png
+demo_*.png
+preview.png
+*.tmp

@@ -1,0 +1,11 @@
+Glance bundles third-party data / libraries:
+
+1. ECDICT — Free English to Chinese Dictionary Database
+   https://github.com/skywind3000/ECDICT
+   License: MIT
+   The file `glance-dict.db` is a filtered subset (common words only) of the
+   ECDICT "stardict" CSV, converted to SQLite by `make_dict.py`.
+
+Runtime Python dependencies keep their own licenses (see requirements.txt):
+mss (MIT), pynput (LGPL-3.0), winsdk (MIT), pystray (LGPL-3.0 / GPL-2.0),
+Pillow (MIT-CMU).
