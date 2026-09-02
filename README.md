@@ -93,7 +93,7 @@ Mac 版计划见 [docs/PORTING-MAC.md](docs/PORTING-MAC.md)。
 
 ## 版本
 
-当前 **1.0.0**,改动记录见 [CHANGELOG.md](CHANGELOG.md)。
+改动记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 致谢与许可
 
