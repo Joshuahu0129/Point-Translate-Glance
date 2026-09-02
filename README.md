@@ -7,6 +7,17 @@ Windows 10/11 · 绿色免安装 · 作者 [Joshua Hu](https://github.com/Joshua
 
 ![预览](docs/preview.png)
 
+---
+
+> ### 只想用?
+> 到 **[Releases](https://github.com/Joshuahu0129/Point-Translate-Glance/releases)**
+> 下载 **`Glance.exe`** 一个文件,双击就能用 —— 不用下载本仓库其它任何东西,不用装
+> Python,不用安装。下面的内容都是给想改代码的人看的。
+>
+> 用法和常见问题见 [docs/快速使用说明.md](docs/快速使用说明.md)。
+
+---
+
 ## 为什么好用
 
 - **全局取词,不挑软件**。浏览器、PDF、Word、聊天窗口、图片、视频字幕……只要

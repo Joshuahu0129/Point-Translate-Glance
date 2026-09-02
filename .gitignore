@@ -18,8 +18,10 @@ ecdict*.csv
 # App runtime
 config.json
 
-# Dev scratch
-demo.png
-demo_*.png
-preview.png
+# Dev scratch  (docs/preview.png IS tracked - see !rule below)
+/demo.png
+/demo_*.png
+/preview.png
+_patch.py
 *.tmp
+!docs/preview.png

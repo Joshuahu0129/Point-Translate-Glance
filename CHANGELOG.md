@@ -7,6 +7,18 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-02
+
+### 变更
+- 卡片去掉关闭按钮(✕):松开热键即消失,钉住状态点 📌 取消。
+- 🔊 朗读按钮移到右上角、与 📌 并排;两个图标加大、加底色,视觉更有分量。
+- 中文字体较英文缩小 1pt(CJK 字形本就偏大),标题释义加粗以增加重量感;
+  例句英文用 Segoe UI、中文用微软雅黑,分别控制字号。
+- 托盘默认深色主题(1.0.0 起)。
+
+### 修复
+- `docs/preview.png` 之前被 `.gitignore` 误排除,导致 README 预览图裂开。
+
 ## [1.0.0] - 2026-09-02
 
 首个版本。
@@ -32,5 +44,6 @@
 - 圆角用 Win32 窗口区域实现,Windows 10 上无原生投影阴影。
 - 依赖 Windows 英文 OCR 语言包(首次运行会提示安装)。
 
-[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/releases/tag/v1.0.0

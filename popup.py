@@ -12,29 +12,30 @@ import tkinter.font as tkfont
 from config import APP_NAME, AUTHOR_TIP
 
 # Segoe MDL2 Assets glyphs (present on Windows 10/11)
-IC_PIN = ""
-IC_UNPIN = ""
-IC_CLOSE = ""
-IC_SPEAK = ""
+IC_PIN = "\uE718"     # Pin
+IC_UNPIN = "\uE77A"   # Unpin
+IC_SPEAK = "\uE767"   # Volume
 
 LIGHT = {
     "border": "#E4E4E7", "card": "#FFFFFF",
     "word": "#1D1D1F", "phon": "#86868B", "label": "#9A9AA0",
-    "accent": "#0A84FF", "primary": "#0A84FF",
-    "chip_bg": "#F1F1F4", "chip_fg": "#3C3C43",
-    "pos_bg": "#EAF2FE", "pos_fg": "#0A6CE0",
-    "sent": "#48484A", "sent_dim": "#7A7A80",
-    "icon": "#8A8A8F", "icon_hover_bg": "#ECECEF",
+    "accent": "#0A84FF", "primary": "#0A6CE0",
+    "chip_bg": "#EEEEF1", "chip_fg": "#2E2E33",
+    "pos_bg": "#E4EFFE", "pos_fg": "#0A63D6",
+    "sent": "#3C3C43", "sent_dim": "#5C5C63",
+    "icon": "#5A5A60", "icon_hi": "#1D1D1F",
+    "icon_bg": "#EDEDF0", "icon_hover_bg": "#DEDEE3",
     "sep": "#EEEEF1", "name": "#B8B8BE",
 }
 DARK = {
     "border": "#3A3A3C", "card": "#262629",
     "word": "#F5F5F7", "phon": "#9A9AA0", "label": "#8A8A8F",
-    "accent": "#0A84FF", "primary": "#409CFF",
-    "chip_bg": "#37373A", "chip_fg": "#D8D8DC",
-    "pos_bg": "#12385F", "pos_fg": "#6FB4FF",
-    "sent": "#C7C7CC", "sent_dim": "#98989E",
-    "icon": "#98989E", "icon_hover_bg": "#37373A",
+    "accent": "#0A84FF", "primary": "#4C9EFF",
+    "chip_bg": "#3A3A3E", "chip_fg": "#E6E6EA",
+    "pos_bg": "#123A63", "pos_fg": "#7ABBFF",
+    "sent": "#D6D6DB", "sent_dim": "#A6A6AC",
+    "icon": "#BFBFC5", "icon_hi": "#FFFFFF",
+    "icon_bg": "#333338", "icon_hover_bg": "#454549",
     "sep": "#333336", "name": "#6E6E73",
 }
 
@@ -66,15 +67,20 @@ class Popup:
         self._drag = None
 
         fs = int(cfg.get("font_size", 12))
+        cjk = "Microsoft YaHei UI"
         self.f_word = tkfont.Font(family="Segoe UI Semibold", size=fs + 4, weight="bold")
         self.f_phon = tkfont.Font(family="Segoe UI", size=fs)
         self.f_label = tkfont.Font(family="Segoe UI", size=fs - 3)
-        self.f_primary = tkfont.Font(family="Microsoft YaHei UI", size=fs + 2)
-        self.f_chip = tkfont.Font(family="Microsoft YaHei UI", size=fs - 2)
+        # CJK glyphs read ~1pt larger than Latin at the same size -> shrink 1pt;
+        # bump weight where it carries meaning (headline + highlight).
+        self.f_primary = tkfont.Font(family=cjk, size=fs + 1, weight="bold")
+        self.f_chip = tkfont.Font(family=cjk, size=fs - 3)
         self.f_pos = tkfont.Font(family="Segoe UI Semibold", size=fs - 3, weight="bold")
-        self.f_sent = tkfont.Font(family="Microsoft YaHei UI", size=fs - 1)
-        self.f_sent_b = tkfont.Font(family="Microsoft YaHei UI", size=fs - 1, weight="bold")
-        self.f_icon = tkfont.Font(family="Segoe MDL2 Assets", size=fs - 1)
+        self.f_sent = tkfont.Font(family="Segoe UI", size=fs - 1)
+        self.f_sent_cn = tkfont.Font(family=cjk, size=fs - 2)
+        self.f_sent_b = tkfont.Font(family="Segoe UI Semibold", size=fs - 1, weight="bold")
+        self.f_sent_cn_b = tkfont.Font(family=cjk, size=fs - 2, weight="bold")
+        self.f_icon = tkfont.Font(family="Segoe MDL2 Assets", size=fs + 3)
         self.f_name = tkfont.Font(family="Segoe UI", size=fs - 4)
 
         self.content_w = max(300, int(cfg.get("card_width", 380)))
@@ -103,8 +109,8 @@ class Popup:
         self.groups = tk.Frame(self.card, bg=p["card"])
 
         self.sep = tk.Frame(self.card, bg=p["sep"], height=1)
-        self.t_en = self._make_text(p["sent"])
-        self.t_cn = self._make_text(p["sent_dim"])
+        self.t_en = self._make_text(p["sent"], self.f_sent, self.f_sent_b)
+        self.t_cn = self._make_text(p["sent_dim"], self.f_sent_cn, self.f_sent_cn_b)
 
         self.l_name = tk.Label(self.card, text=APP_NAME, bg=p["card"], fg=p["name"],
                                font=self.f_name, cursor="hand2")
@@ -130,44 +136,46 @@ class Popup:
         self.l_phon = tk.Label(self.l_word_wrap, bg=p["card"], fg=p["phon"],
                                font=self.f_phon)
         self.l_phon.pack(side="left", padx=(8, 0), pady=(6, 0))
-        self.b_speak = self._icon_btn(self.l_word_wrap, IC_SPEAK,
-                                      lambda e: self.on_speak(self._word))
-        self.b_speak.pack(side="left", padx=(6, 0), pady=(4, 0))
 
-        self.b_close = self._icon_btn(self.header, IC_CLOSE, self._do_close)
-        self.b_pin = self._icon_btn(self.header, IC_PIN, self._toggle_pin)
-        self.b_close.pack(side="right")
-        self.b_pin.pack(side="right", padx=(0, 2))
+        # right-side controls: speaker + pin, sitting in a weighted chip
+        tools = tk.Frame(self.header, bg=p["card"])
+        tools.pack(side="right", pady=(2, 0))
+        self.b_pin = self._icon_btn(tools, IC_PIN, self._toggle_pin)
+        self.b_speak = self._icon_btn(tools, IC_SPEAK,
+                                      lambda e: self.on_speak(self._word))
+        self.b_speak.pack(side="left", padx=(0, 4))
+        self.b_pin.pack(side="left")
 
     def _icon_btn(self, parent, glyph, cb):
         p = self.pal
-        b = tk.Label(parent, text=glyph, font=self.f_icon, bg=p["card"],
-                     fg=p["icon"], padx=5, pady=3, cursor="hand2")
-        b.bind("<Enter>", lambda e: b.config(bg=p["icon_hover_bg"]))
-        b.bind("<Leave>", lambda e: b.config(bg=p["card"]))
+        b = tk.Label(parent, text=glyph, font=self.f_icon, bg=p["icon_bg"],
+                     fg=p["icon"], padx=8, pady=5, cursor="hand2")
+        b.bind("<Enter>", lambda e: b.config(bg=p["icon_hover_bg"], fg=p["icon_hi"]))
+        b.bind("<Leave>", lambda e: b.config(bg=p["icon_bg"], fg=p["icon"]))
         b.bind("<Button-1>", cb)
         return b
 
-    def _make_text(self, fg):
+    def _make_text(self, fg, font, font_b):
         p = self.pal
-        cw = max(1, self.f_sent.measure("0"))
+        cw = max(1, font.measure("0"))
         t = tk.Text(self.card, height=1, width=max(10, self.content_w // cw),
                     wrap="word", bd=0, highlightthickness=0,
-                    bg=p["card"], fg=fg, font=self.f_sent, cursor="arrow",
+                    bg=p["card"], fg=fg, font=font, cursor="arrow",
                     padx=0, pady=0, spacing1=1, spacing3=3)
-        t.tag_config("hl", foreground=p["accent"], font=self.f_sent_b)
+        t.tag_config("hl", foreground=p["accent"], font=font_b)
+        t._font = font
         t.bind("<ButtonPress-1>", self._drag_start)
         t.bind("<B1-Motion>", self._drag_move)
         return t
 
-    def _line_count(self, text):
+    def _line_count(self, font, text):
         n, cur = 1, 0
         for tok in re.findall(r"\s+|\S+", text or ""):
             if "\n" in tok:
                 n += tok.count("\n")
                 cur = 0
                 continue
-            w = self.f_sent.measure(tok)
+            w = font.measure(tok)
             if cur + w > self.content_w and cur > 0:
                 n += 1
                 cur = 0 if tok.strip() == "" else w
@@ -213,7 +221,7 @@ class Popup:
         for a, b in spans:
             widget.tag_add("hl", "1.0+%dc" % a, "1.0+%dc" % b)
         widget.configure(state="disabled",
-                         height=max(1, min(6, self._line_count(text))))
+                         height=max(1, min(6, self._line_count(widget._font, text))))
 
     def show(self, anchor, data):
         """data: dict(word, phonetic, primary, pos_groups, sentence_en,
@@ -317,7 +325,7 @@ class Popup:
         self._sync_pin()
         self.win.withdraw()
 
-    # ---- pin / close / drag ------------------------------------
+    # ---- pin / drag ------------------------------------
     def _toggle_pin(self, _=None):
         self.pinned = not self.pinned
         self._sync_pin()
@@ -327,11 +335,9 @@ class Popup:
 
     def _sync_pin(self):
         self.b_pin.config(text=IC_UNPIN if self.pinned else IC_PIN,
-                          fg=self.pal["accent"] if self.pinned else self.pal["icon"])
-
-    def _do_close(self, _=None):
-        self.force_hide()
-        self.on_unpin()
+                          fg=self.pal["accent"] if self.pinned else self.pal["icon"],
+                          bg=self.pal["icon_hover_bg"] if self.pinned
+                          else self.pal["icon_bg"])
 
     def _drag_start(self, e):
         self._drag = (e.x_root, e.y_root,
