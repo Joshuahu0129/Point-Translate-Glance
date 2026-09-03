@@ -7,7 +7,25 @@
 
 ## [Unreleased]
 
-## [1.0.3] - 2026-09-02
+## [1.0.4] - 2026-09-02
+
+翻译从 1–5 秒降到零点几秒。
+
+### 性能
+- **换翻译接口**:旧的 `translate_a/single` 已被 Google 限流(HTTP 429),换成
+  `clients5.google.com` 的 `dict-chrome-ex` 接口(Google 词典扩展用的那个),
+  限流宽松得多。
+- **连接复用**:所有请求走同一个 keep-alive 会话,省掉每次的 TLS 握手
+  (~100–200ms);自动使用系统 / 环境变量里的代理。
+- **启动预热**:开程序时后台先建好连接,第一次查词不再等握手。
+- **卡片分两段渲染**:单词 + 音标 + 词性从离线词典**立刻**显示(~50ms),
+  整句翻译好了再补进来(其间显示"翻译中…")。
+- 去抖 130ms → 70ms(旧配置自动升级)。
+
+实测:单词 ~85ms,整句 ~165ms(热连接);之前是 700–5700ms。
+
+### 依赖
+- 新增 `requests`(exe 体积 +1.5MB)。
 
 ### 新增
 - **已选中文字优先**:取词时如果已经框选了一段文字,翻译的"句子"就用选区,
@@ -69,7 +87,8 @@
 - 圆角用 Win32 窗口区域实现,Windows 10 上无原生投影阴影。
 - 依赖 Windows 英文 OCR 语言包(首次运行会提示安装)。
 
-[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.0...v1.0.1

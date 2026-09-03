@@ -85,11 +85,12 @@ Mac 版计划见 [docs/PORTING-MAC.md](docs/PORTING-MAC.md)。
 | `engine_order` | 整句翻译引擎顺序 | `["google","mymemory"]` |
 | `card_width` / `corner_radius` / `font_size` / `opacity` | 卡片外观 | 400 / 16 / 12 / 1.0 |
 | `capture_width` / `capture_height` | 取词截图区域 px | 1400 / 120 |
-| `debounce_ms` / `linger_ms` | 静止多久查词 / 松键后停留 | 130 / 500 |
+| `debounce_ms` / `linger_ms` | 静止多久查词 / 松键后停留 | 70 / 500 |
+| `use_selection` | 已框选文字时用选区作为句子 | `true` |
 | `auto_speak` | 弹出时自动朗读 | `false` |
 
-大陆网络访问不了 Google 时,把 `engine_order` 改成 `["mymemory"]`,或
-`translate_source` 设为 `local` 并接受"整句仍需 Google"。
+整句翻译走 `clients5.google.com`(Google 词典扩展用的接口),会自动使用系统 /
+环境变量里的代理。访问不了就把 `engine_order` 改成 `["mymemory"]`。
 
 ## 版本
 

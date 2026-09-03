@@ -9,7 +9,7 @@ import os
 import sys
 
 APP_NAME = "Glance"
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 AUTHOR = "Joshua Hu"
 AUTHOR_TIP = "Made by Joshua Hu"
 VERSION_LINE = "Version %s · by %s" % (VERSION, AUTHOR)
@@ -48,7 +48,7 @@ DEFAULT = {
     # Corner radius of the popup card, px.
     "corner_radius": 16,
     # How long the mouse must be still (ms) before a lookup fires.
-    "debounce_ms": 130,
+    "debounce_ms": 70,
     # Keep the card on screen this many ms after the hotkey is released
     # (0 = vanish immediately). Pin (📌) always keeps it regardless.
     "linger_ms": 500,
@@ -98,6 +98,10 @@ def _migrate(cfg):
         changed = True
     if int(cfg.get("capture_height", 0)) < 100:
         cfg["capture_height"] = DEFAULT["capture_height"]
+        changed = True
+    # 1.0.4: faster translation - shorter debounce is fine now
+    if int(cfg.get("debounce_ms", 0)) >= 120:
+        cfg["debounce_ms"] = DEFAULT["debounce_ms"]
         changed = True
     return changed
 

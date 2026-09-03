@@ -325,9 +325,14 @@ class Popup:
 
     def show(self, anchor, data):
         """data: dict(word, phonetic, primary, pos_groups, sentence_en,
-                      sentence_cn, spans_en, spans_cn)"""
+                      sentence_cn, spans_en, spans_cn, _translating)
+
+        Called up to twice per lookup: once with the offline data (instant),
+        then again once the online sentence translation lands. On the second
+        call for the same word the card keeps its position."""
         p = self.pal
         self._show_word_row()
+        same = (data.get("word") == self._word and self.win.winfo_viewable())
         self._word = data.get("word", "")
         self.l_word.config(text=self._word)
         phon = data.get("phonetic") or ""
@@ -356,14 +361,18 @@ class Popup:
             self.sep.pack(fill="x", pady=(11, 9))
             self._set_sentence(self.t_en, sen, data.get("spans_en") or [])
             self.t_en.pack(fill="x")
-            if data.get("sentence_cn"):
-                self._set_sentence(self.t_cn, data["sentence_cn"],
-                                   data.get("spans_cn") or [])
+            cn = data.get("sentence_cn")
+            if cn:
+                self._set_sentence(self.t_cn, cn, data.get("spans_cn") or [])
+                self.t_cn.pack(fill="x", pady=(3, 0))
+            elif data.get("_translating"):
+                self._set_sentence(self.t_cn, "翻译中…", [])
                 self.t_cn.pack(fill="x", pady=(3, 0))
 
         self.l_name.pack(anchor="e", pady=(9, 0))
 
-        self._place(anchor)
+        if not same:
+            self._place(anchor)
         self._apply_region()
 
     def show_loading(self, anchor):

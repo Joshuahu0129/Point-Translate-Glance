@@ -44,6 +44,7 @@ import tts
 from config import APP_NAME
 from ocr import ocr_available, ocr_png_bytes
 from popup import Popup
+import translate as _tr
 from translate import TranslateError, translate
 
 _kbd = keyboard.Controller()
@@ -349,6 +350,11 @@ def align_cn(sentence_cn, candidates):
 
 
 # --- worker ------------------------------------------------------------
+def _is_current(gen):
+    with _lock:
+        return gen == _state["gen"]
+
+
 def worker_loop():
     sct = (getattr(mss, "MSS", None) or mss.mss)()
     while True:
@@ -357,11 +363,22 @@ def worker_loop():
             if gen != _state["gen"] or not _state["held"]:
                 continue
         try:
-            data = do_lookup(sct, x, y)
+            data, finish = do_lookup_fast(sct, x, y)
         except Exception as e:  # noqa: BLE001
             result_q.put(("error", gen, (x, y), str(e)))
             continue
-        result_q.put(("show" if data else "none", gen, (x, y), data))
+        if data is None:
+            result_q.put(("none", gen, (x, y), None))
+            continue
+        # stage 1: word + phonetics + POS + the original sentence, right away
+        result_q.put(("show", gen, (x, y), data))
+        # stage 2: the online translation streams in
+        if finish and _is_current(gen):
+            try:
+                finish()
+            except Exception:  # noqa: BLE001
+                data["_translating"] = False
+            result_q.put(("show", gen, (x, y), data))
 
 
 def _vscreen():
@@ -370,82 +387,80 @@ def _vscreen():
             u.GetSystemMetrics(78), u.GetSystemMetrics(79))
 
 
-def do_lookup(sct, x, y):
+def do_lookup_fast(sct, x, y):
+    """Everything that doesn't touch the network (~35 ms). Returns
+    (data, finish) where finish() runs the online translation in place, or
+    (None, None) when there's nothing under the cursor."""
     w, h = int(CFG["capture_width"]), int(CFG["capture_height"])
     vx, vy, vw, vh = _vscreen()
     left = max(vx, min(x - w // 2, vx + vw - w))
     top = max(vy, min(y - h // 2, vy + vh - h))
 
-    # fire a copy for any active selection; it lands while OCR runs
     _sel_saved = _selection_probe_begin()
-
     shot = sct.grab({"left": left, "top": top, "width": w, "height": h})
     png = mss.tools.to_png(shot.rgb, shot.size)
     lines = ocr_png_bytes(png, CFG.get("ocr_language", "en-US"))
     word, cur_line = pick_word(lines, x - left, y - top)
-
     selection = _selection_probe_end(_sel_saved)
 
     if not word or not re.search(r"[A-Za-z]", word):
-        # nothing under the cursor, but a phrase is selected -> translate it
         if selection:
-            word = re.split(r"\s+", re.sub(r"[^A-Za-z\s'-]", " ", selection).strip())[0]
+            word = re.split(r"\s+",
+                            re.sub(r"[^A-Za-z\s'-]", " ", selection).strip())[0]
         if not word or not re.search(r"[A-Za-z]", word):
-            return None
+            return None, None
         cur_line = None
 
-    if selection:
-        sentence = selection
-    else:
-        sentence = assemble_sentence(lines, cur_line, word)
+    sentence = selection or assemble_sentence(lines, cur_line, word)
 
     order = tuple(CFG.get("engine_order", ["google", "mymemory"]))
     tl = CFG.get("target_language", "zh-CN")
     source = str(CFG.get("translate_source", "local")).lower()
-
     entry = dictionary.lookup(word)
-    data = {"word": word, "phonetic": "", "primary": "", "pos_groups": [],
-            "sentence_en": None, "sentence_cn": None, "spans_en": [], "spans_cn": []}
 
-    def online_word():
-        try:
-            return re.sub(r"\s+", " ", translate(word, tl, order)[0]).strip()
-        except TranslateError:
-            return ""
+    data = {"word": word, "phonetic": entry.phonetic if entry else "",
+            "primary": "", "pos_groups": entry.pos_groups if entry else [],
+            "sentence_en": None, "sentence_cn": None,
+            "spans_en": [], "spans_cn": [], "_translating": False}
 
-    cn_candidates = []
-    if entry:  # phonetics + POS chips always come from the offline dictionary
-        data["phonetic"] = entry.phonetic
-        data["pos_groups"] = entry.pos_groups
-        cn_candidates = list(entry.meanings)
+    cn_candidates = list(entry.meanings) if entry else []
+    if entry and source != "google":
+        data["primary"] = entry.primary()
 
-    if source == "google":
-        wt = online_word()
-        data["primary"] = wt or (entry.primary() if entry else "(在线翻译失败)")
-        if wt:
-            cn_candidates = re.split(r"[；;，,、\s]+", wt) + cn_candidates
-    else:  # local
-        if entry:
-            data["primary"] = entry.primary()
-        else:
-            wt = online_word()
-            data["primary"] = wt or "(词典未收录, 在线翻译失败)"
-            cn_candidates = re.split(r"[；;，,、\s]+", wt)
-
-    if sentence and len(sentence.split()) > 1 \
-            and sentence.strip().lower() != word.strip().lower():
+    has_sentence = bool(sentence and len(sentence.split()) > 1
+                        and sentence.strip().lower() != word.strip().lower())
+    if has_sentence:
         data["sentence_en"] = sentence
         data["spans_en"] = spans_in(sentence, word)
-        try:
-            st, _ = translate(sentence, tl, order)
-            data["sentence_cn"] = st
-            if entry and source != "google":  # help the CN-side alignment
-                cn_candidates = cn_candidates + re.split(r"[；;，,、\s]+",
-                                                         online_word())
-            data["spans_cn"] = align_cn(st, cn_candidates)
-        except TranslateError:
-            data["sentence_cn"] = None
-    return data
+
+    need_word_online = (source == "google") or not entry
+    if need_word_online or has_sentence:
+        data["_translating"] = True
+
+    def finish():
+        wt = ""
+        if need_word_online:
+            try:
+                wt = re.sub(r"\s+", " ", translate(word, tl, order)[0]).strip()
+            except TranslateError:
+                wt = ""
+        if source == "google":
+            data["primary"] = wt or data["primary"] or (
+                entry.primary() if entry else "(在线翻译失败)")
+        elif not entry:
+            data["primary"] = wt or "(词典未收录, 在线翻译失败)"
+        cands = cn_candidates + (re.split(r"[；;，,、\s]+", wt) if wt else [])
+
+        if has_sentence:
+            try:
+                st, _ = translate(sentence, tl, order)
+                data["sentence_cn"] = st
+                data["spans_cn"] = align_cn(st, cands)
+            except TranslateError:
+                data["sentence_cn"] = "(整句翻译失败)"
+        data["_translating"] = False
+
+    return data, (finish if data["_translating"] else None)
 
 
 # --- Tk poll loop -----------------------------------------------------
@@ -594,6 +609,9 @@ def main():
         )
     if not dictionary.available():
         print("提示: 未找到 glance-dict.db, 将只用在线翻译(无音标/词性)。")
+
+    _tr.prewarm(CFG.get("target_language", "zh-CN"),
+                CFG.get("engine_order", ["google", "mymemory"]))
 
     threading.Thread(target=worker_loop, daemon=True).start()
     threading.Thread(target=debounce_loop, daemon=True).start()
