@@ -32,29 +32,35 @@
 
 ## 从源码运行 / 开发
 
-需要 **Python 3.10 – 3.12**。
+需要 **Python 3.12**(`winsdk` 没有 3.13 / 3.14 的 wheel)。
 
 ```bat
-git clone https://github.com/Joshuahu0129/Point-Translate-Glance.git
-cd Point-Translate-Glance
-python -m venv .venv
+git clone https://github.com/Joshuahu0129/Point-Translate-Glance.git point-translate-glance
+cd point-translate-glance
+setup-dev.bat              REM 建 .venv(3.12) + 装全部依赖,一次搞定
 .venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
+python selftest.py         REM 端到端自检,应输出 PIPELINE OK
+python main.py             REM 从源码运行
 ```
 
-`glance-dict.db` 已随仓库提供。要自己重建(需 `pip install py7zr`):
+`setup-dev.bat` 会优先用 [uv](https://astral.sh/uv),没有再退回 `py -3.12`。
+在 Cursor / VSCode 里把解释器选到 `.venv\Scripts\python.exe`。
+
+打包 exe:
+
+```bat
+build.bat                  REM 产物: dist\Glance.exe(会自动用 .venv 里的 pyinstaller)
+```
+
+`glance-dict.db` 已随仓库提供。要自己重建:
 
 ```bat
 python make_dict.py        REM 下载 ECDICT stardict.7z 并生成常用词子集
 ```
 
-打包 exe:
-
-```bat
-pip install pyinstaller
-build.bat                  REM 产物: dist\Glance.exe
-```
+**发布新版本**:改 `config.py` 的 `VERSION` → 更新 `CHANGELOG.md` → `build.bat` →
+`git tag vX.Y.Z && git push --tags` → `gh release create vX.Y.Z dist\Glance.exe` →
+`sync-to-nas.bat`(刷新 NAS 上的只读镜像)。
 
 ## 代码结构
 

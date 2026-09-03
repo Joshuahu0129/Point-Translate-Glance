@@ -18,10 +18,12 @@ ecdict*.csv
 # App runtime
 config.json
 
-# Dev scratch  (docs/preview.png IS tracked - see !rule below)
+# NAS mirror marker (written by sync-to-nas.bat, only exists on the mirror)
+MIRROR.txt
+
+# Dev scratch  (docs/preview.png is committed and lives under docs/, not here)
 /demo.png
 /demo_*.png
 /preview.png
-_patch.py
+_*.py
 *.tmp
-!docs/preview.png

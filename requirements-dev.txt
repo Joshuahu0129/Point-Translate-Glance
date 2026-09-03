@@ -1,4 +1,9 @@
 # Extra tooling for building / maintaining Glance (not needed to just run it).
 -r requirements.txt
-pyinstaller>=6.10          # build Glance.exe  (build.bat)
+
+# PyInstaller: pinned. 6.22 + hooks-contrib 2026.7 ship a broken rthook set
+# (missing pyi_rth_cryptography_openssl.py) that aborts the build on this repo.
+pyinstaller==6.11.1
+pyinstaller-hooks-contrib==2024.10
+
 py7zr>=0.21               # extract ECDICT stardict.7z  (make_dict.py)

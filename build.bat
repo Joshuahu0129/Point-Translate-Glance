@@ -1,8 +1,17 @@
 @echo off
-REM Build Glance.exe (single file). Requires:  pip install pyinstaller
-REM glance-dict.db must already exist (run make_dict.py once to create it).
+REM Build Glance.exe (single file).
+REM   - run setup-dev.bat first (it puts pyinstaller in .venv)
+REM   - glance-dict.db must exist (it is committed; make_dict.py regenerates it)
+setlocal
+cd /d "%~dp0"
 
-pyinstaller --noconfirm --clean --onefile --noconsole ^
+if exist ".venv\Scripts\pyinstaller.exe" (
+    set "PYI=.venv\Scripts\pyinstaller.exe"
+) else (
+    set "PYI=pyinstaller"
+)
+
+%PYI% --noconfirm --clean --onefile --noconsole ^
   --name Glance ^
   --add-data "glance-dict.db;." ^
   --collect-binaries winsdk ^
@@ -11,8 +20,10 @@ pyinstaller --noconfirm --clean --onefile --noconsole ^
   --hidden-import winsdk.windows.graphics.imaging ^
   --hidden-import winsdk.windows.storage.streams ^
   --hidden-import winsdk.windows.foundation ^
+  --hidden-import PIL.ImageTk ^
   main.py
 
-echo.
-echo Done -> dist\Glance.exe
+echo(
+echo Done -^> dist\Glance.exe
+endlocal
 pause
