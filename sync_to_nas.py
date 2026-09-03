@@ -12,6 +12,11 @@ import sys
 
 NAS = pathlib.Path(r"G:\03-开发中心\03-活跃 active\Point-Translate-Glance")
 REPO = "https://github.com/Joshuahu0129/Point-Translate-Glance.git"
+HERE = pathlib.Path(__file__).parent
+
+# Files that are git-ignored (never pushed to GitHub) but must still be backed
+# up. They are copied into the NAS mirror on every sync.
+KEEP_LOCAL = ["AGENTS.md", "CLAUDE.md", "DECISIONS.md"]
 
 
 def git(*args, cwd=None):
@@ -28,6 +33,14 @@ def main():
         git("fetch", "--all", "--tags", "--prune", cwd=NAS)
         git("reset", "--hard", "origin/main", cwd=NAS)
 
+    # back up the git-ignored local-only docs
+    copied = []
+    for name in KEEP_LOCAL:
+        src = HERE / name
+        if src.exists():
+            (NAS / name).write_bytes(src.read_bytes())
+            copied.append(name)
+
     ver = git("describe", "--tags", "--always", cwd=NAS)
     short = git("rev-parse", "--short", "HEAD", cwd=NAS)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -37,10 +50,12 @@ def main():
         f"提交:   {short}\n"
         f"同步于: {now}\n"
         "源:     https://github.com/Joshuahu0129/Point-Translate-Glance\n"
-        "开发在: E:\\dev\\point-translate-glance\n",
+        "开发在: E:\\dev\\point-translate-glance\n"
+        + (("本地文件备份: " + ", ".join(copied) + "\n") if copied else ""),
         encoding="utf-8-sig",
     )
-    print(f"[ok] mirror synced -> {ver} ({short})")
+    print(f"[ok] mirror synced -> {ver} ({short})"
+          + (f"  + local: {', '.join(copied)}" if copied else ""))
 
 
 if __name__ == "__main__":

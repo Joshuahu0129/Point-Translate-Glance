@@ -18,6 +18,13 @@ ecdict*.csv
 # App runtime
 config.json
 
+# Local-only project docs — kept out of the public repo, backed up to the NAS
+# mirror by sync-to-nas.bat (see KEEP_LOCAL in sync_to_nas.py)
+AGENTS.md
+CLAUDE.md
+DECISIONS.md
+.claude/
+
 # NAS mirror marker (written by sync-to-nas.bat, only exists on the mirror)
 MIRROR.txt
 
