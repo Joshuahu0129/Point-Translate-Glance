@@ -84,7 +84,8 @@ def load():
     p = config_path()
     if os.path.exists(p):
         try:
-            with open(p, "r", encoding="utf-8") as f:
+            # utf-8-sig: tolerate a BOM (Notepad adds one when you "save as")
+            with open(p, "r", encoding="utf-8-sig") as f:
                 user = json.load(f)
             if isinstance(user, dict):
                 cfg.update(user)
