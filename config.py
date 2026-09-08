@@ -15,8 +15,8 @@ AUTHOR_TIP = "Made by Joshua Hu"
 VERSION_LINE = "Version %s · by %s" % (VERSION, AUTHOR)
 
 DEFAULT = {
-    # Modifier you hold while pointing at a word: "shift" | "ctrl" | "alt"
-    "hotkey": "shift",
+    # Key you hold while pointing at a word: "f2" | "ctrl" | "alt" | "shift"
+    "hotkey": "f2",
     # Target language for online translation (Google language code).
     "target_language": "zh-CN",
     # OCR language / BCP-47 tag. The matching Windows language pack with the
@@ -112,11 +112,10 @@ def _migrate(cfg):
     if int(cfg.get("debounce_ms", 0)) >= 120:
         cfg["debounce_ms"] = DEFAULT["debounce_ms"]
         changed = True
-    # 1.1.0: default modifier moved ctrl -> shift (Ctrl collided with editors'
-    # Ctrl+C / Ctrl+click and with the selection-probe copy). Only rewrite the
-    # value when it is still the old default.
-    if str(cfg.get("hotkey", "")).lower() == "ctrl":
-        cfg["hotkey"] = "shift"
+    # 1.1.0: default hotkey moved to F2. Ctrl collided with copy / Ctrl+click;
+    # Shift (tried mid-development) collided too. Rewrite the earlier defaults.
+    if str(cfg.get("hotkey", "")).lower() in ("ctrl", "shift"):
+        cfg["hotkey"] = "f2"
         changed = True
     return changed
 

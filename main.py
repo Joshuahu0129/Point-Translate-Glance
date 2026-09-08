@@ -1,6 +1,6 @@
 """Glance - hover an English word, see the translation.
 
-Hold the configured modifier (default Shift) and point at a word: an
+Hold the configured hotkey (default F2) and point at a word: an
 Apple-flavoured card shows its phonetics, part-of-speech meanings and, for a
 full line, the sentence translation with the word highlighted on both sides.
 Click the pin to keep the card without holding the key.
@@ -112,15 +112,14 @@ def _selection_probe_begin():
     """Drop a sentinel on the clipboard and fire a copy; the copy lands while
     the screenshot + OCR run. Returns the saved clipboard text (or None).
 
-    With hotkey "shift" the physical Shift is still down, so the synthesized
-    combo is actually Ctrl+Shift+C - harmless in normal text fields, but a few
-    apps bind it. Users can disable via config `use_selection`.
+    F2 / Alt aren't modifiers, so we synthesize a clean Ctrl+C. With hotkey
+    "shift" the physical Shift is still down, so it's really Ctrl+Shift+C -
+    harmless in normal text fields but a few apps bind it; config
+    `use_selection` turns the whole probe off.
     """
     if not CFG.get("use_selection", True):
         return False
-    hk = str(CFG.get("hotkey", "shift")).lower()
-    if hk not in ("ctrl", "shift"):
-        return False
+    hk = str(CFG.get("hotkey", "f2")).lower()
     try:
         saved = _clip_get()
         _clip_set(_SENTINEL)
@@ -155,6 +154,7 @@ def _selection_probe_end(saved):
 CFG = cfg_mod.load()
 
 HOTKEY_MAP = {
+    "f2": {keyboard.Key.f2},
     "ctrl": {keyboard.Key.ctrl_l, keyboard.Key.ctrl_r, keyboard.Key.ctrl},
     "alt": {keyboard.Key.alt_l, keyboard.Key.alt_r, keyboard.Key.alt,
             getattr(keyboard.Key, "alt_gr", keyboard.Key.alt_r)},
@@ -163,8 +163,8 @@ HOTKEY_MAP = {
 
 
 def hotkey_keys():
-    return HOTKEY_MAP.get(str(CFG.get("hotkey", "shift")).lower(),
-                          HOTKEY_MAP["shift"])
+    return HOTKEY_MAP.get(str(CFG.get("hotkey", "f2")).lower(),
+                          HOTKEY_MAP["f2"])
 
 
 job_q = queue.Queue()
@@ -592,7 +592,7 @@ def make_tray(root, holder):
 
     M = pystray.MenuItem
     menu = pystray.Menu(
-        M("按住 %s 划词 · 点 📌 钉住" % CFG.get("hotkey", "shift").capitalize(),
+        M("按住 %s 划词 · 点 📌 钉住" % CFG.get("hotkey", "f2").capitalize(),
           None, enabled=False),
         pystray.Menu.SEPARATOR,
         M(lambda i: "切换为 Google 翻译"
@@ -652,7 +652,7 @@ def main():
 
     make_tray(root, holder)
     print("%s 已启动。按住 %s 指向英文单词即可翻译。"
-          % (APP_NAME, CFG.get("hotkey", "shift").capitalize()))
+          % (APP_NAME, CFG.get("hotkey", "f2").capitalize()))
 
     root.after(25, poll, root, holder)
     try:
