@@ -1,6 +1,6 @@
 # Glance 全局翻译
 
-**按住 Ctrl,鼠标指到哪个英文单词,就翻译哪个。** 一张 Apple 风格的圆角卡片贴着
+**按住 Shift,鼠标指到哪个英文单词,就翻译哪个。** 一张 Apple 风格的圆角卡片贴着
 光标弹出:音标、按词性分组的中文释义、整句翻译(原文和译文里的目标词同色高亮)。
 
 
@@ -10,7 +10,7 @@
   所在整句的翻译,一眼看懂词、也看懂上下文。
 - **音标和词性离线可用**。内置 ECDICT 词典(约 24 万常用词),没网也能查词、看
   音标;整句翻译才需要联网。
-- **不打扰**。默认要按住 Ctrl 才翻译,松开就消失;想留着看就点 📌 钉住。
+- **不打扰**。默认要按住 Shift 才翻译,松开就消失;想留着看就点 📌 钉住。
 - **顺手的小功能**:🔊 朗读、浅色 / 深色主题、开机自启、翻译来源一键切换。
 - **绿色免安装**。一个 exe,双击即用,不写注册表,删掉就没了。
 
@@ -84,12 +84,14 @@ Mac 版计划见 [docs/PORTING-MAC.md](docs/PORTING-MAC.md)。
 
 | 键 | 说明 | 默认 |
 |---|---|---|
-| `hotkey` | 按住的键:`ctrl` / `alt` / `shift` | `ctrl` |
+| `hotkey` | 按住的键:`shift` / `ctrl` / `alt` | `shift` |
 | `translate_source` | 词义来源:`local`(词典) / `google` | `local` |
 | `theme` | `light` / `dark` | `dark` |
 | `target_language` | 目标语言 | `zh-CN` |
 | `engine_order` | 整句翻译引擎顺序 | `["google","mymemory"]` |
-| `card_width` / `corner_radius` / `font_size` / `opacity` | 卡片外观 | 400 / 16 / 12 / 1.0 |
+| `card_width` / `card_width_max` | 卡片宽度下限 / 上限 px | 400 / 560 |
+| `sentence_max_lines` | 例句最多占几行 | 16 |
+| `corner_radius` / `font_size` / `opacity` / `icon_scale` | 卡片 / 图标外观 | 16 / 12 / 1.0 / 1.0 |
 | `capture_width` / `capture_height` | 取词截图区域 px | 1400 / 120 |
 | `debounce_ms` / `linger_ms` | 静止多久查词 / 松键后停留 | 70 / 500 |
 | `use_selection` | 已框选文字时用选区作为句子 | `true` |

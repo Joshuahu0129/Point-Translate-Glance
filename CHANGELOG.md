@@ -7,6 +7,28 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-08
+
+### 变更
+- **默认热键 Ctrl → Shift**。Ctrl 与编辑器的 Ctrl+C / Ctrl+单击、以及划词剪贴板
+  探测互相干扰。升级时旧配置里的 `hotkey: "ctrl"` 会自动改成 `"shift"`;想继续
+  用 Ctrl,升级后到 `config.json` 重新设一次。
+- **例句英文原句改用粗体**,与已加粗的中文译文一致;高亮词仍靠蓝色区分。
+- **单词标题与主释义之间的行距压到最小**。
+- **喇叭 / 图钉图标重画**为几何线条风格(32px 方形按钮、20px 图标);「已钉住」
+  为填充图钉 + 蓝底。大小可用 `config.json` 的 `icon_scale` 调。
+
+### 新增
+- **卡片自适应大小**:长选区 / 长例句不再截断到 6 行 —— 卡片会先在
+  `card_width` ~ `card_width_max` 之间加宽(换行更好读),再向下增高,最多
+  `sentence_max_lines`(默认 16)行;贴近屏幕底部时整体上移。
+- **指针悬停在卡片上时不再重新查词**,方便把鼠标移上去点 🔊 / 📌,内容不闪。
+- 划词剪贴板探测在 `hotkey` 为 `shift` 时也启用(此前仅 `ctrl`)。
+
+### 已知限制
+- Shift 模式下,划词探测实际发送 Ctrl+Shift+C;个别应用(浏览器开发者工具等)
+  绑了该组合。可用 `config.json` 的 `use_selection: false` 关闭。
+
 ## [1.0.4] - 2026-09-02
 
 翻译从 1–5 秒降到零点几秒。
@@ -87,7 +109,8 @@
 - 圆角用 Win32 窗口区域实现,Windows 10 上无原生投影阴影。
 - 依赖 Windows 英文 OCR 语言包(首次运行会提示安装)。
 
-[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.1...v1.0.2
