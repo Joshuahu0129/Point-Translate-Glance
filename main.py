@@ -1,6 +1,6 @@
 """Glance - hover an English word, see the translation.
 
-Hold the configured modifier (default Ctrl) and point at a word: an
+Hold the configured hotkey (default F2) and point at a word: an
 Apple-flavoured card shows its phonetics, part-of-speech meanings and, for a
 full line, the sentence translation with the word highlighted on both sides.
 Click the pin to keep the card without holding the key.
@@ -110,16 +110,27 @@ def _clip_set(text):
 
 def _selection_probe_begin():
     """Drop a sentinel on the clipboard and fire a copy; the copy lands while
-    the screenshot + OCR run. Returns the saved clipboard text (or None)."""
+    the screenshot + OCR run. Returns the saved clipboard text (or None).
+
+    F2 / Alt aren't modifiers, so we synthesize a clean Ctrl+C. With hotkey
+    "shift" the physical Shift is still down, so it's really Ctrl+Shift+C -
+    harmless in normal text fields but a few apps bind it; config
+    `use_selection` turns the whole probe off.
+    """
     if not CFG.get("use_selection", True):
         return False
-    if str(CFG.get("hotkey", "ctrl")).lower() != "ctrl":
-        return False
+    hk = str(CFG.get("hotkey", "f2")).lower()
     try:
         saved = _clip_get()
         _clip_set(_SENTINEL)
-        _kbd.press("c")
-        _kbd.release("c")
+        if hk == "ctrl":
+            _kbd.press("c")
+            _kbd.release("c")
+        else:
+            _kbd.press(keyboard.Key.ctrl)
+            _kbd.press("c")
+            _kbd.release("c")
+            _kbd.release(keyboard.Key.ctrl)
         return saved if saved is not None else ""
     except Exception:  # noqa: BLE001
         return False
@@ -143,6 +154,7 @@ def _selection_probe_end(saved):
 CFG = cfg_mod.load()
 
 HOTKEY_MAP = {
+    "f2": {keyboard.Key.f2},
     "ctrl": {keyboard.Key.ctrl_l, keyboard.Key.ctrl_r, keyboard.Key.ctrl},
     "alt": {keyboard.Key.alt_l, keyboard.Key.alt_r, keyboard.Key.alt,
             getattr(keyboard.Key, "alt_gr", keyboard.Key.alt_r)},
@@ -151,14 +163,15 @@ HOTKEY_MAP = {
 
 
 def hotkey_keys():
-    return HOTKEY_MAP.get(str(CFG.get("hotkey", "ctrl")).lower(), HOTKEY_MAP["ctrl"])
+    return HOTKEY_MAP.get(str(CFG.get("hotkey", "f2")).lower(),
+                          HOTKEY_MAP["f2"])
 
 
 job_q = queue.Queue()
 result_q = queue.Queue()
 _lock = threading.Lock()
 _state = {"held": False, "gen": 0, "last_move": 0.0, "released_at": 0.0,
-          "pinned": False}
+          "pinned": False, "popup_rect": None}
 
 mouse_ctl = mouse.Controller()
 _PUNCT = "".join(set(string.punctuation) | {"“", "”", "‘", "’", "—", "…", "·", "，", "。"})
@@ -178,6 +191,13 @@ def request_translation():
     with _lock:
         if _state["pinned"]:          # frozen while pinned
             return
+        r = _state["popup_rect"]      # frozen while the pointer is over the card
+        if r is not None:
+            rx, ry, rw, rh = r
+            m = 6                     # small margin so edge buttons stay reachable
+            if rw > 1 and rx - m <= x <= rx + rw + m \
+                    and ry - m <= y <= ry + rh + m:
+                return
         _state["gen"] += 1
         gen = _state["gen"]
         held = _state["held"]
@@ -474,8 +494,16 @@ def _active(popup):
 
 def poll(root, holder):
     popup = holder["popup"]
+    rect = None
+    try:
+        if popup.win.winfo_viewable():
+            rect = (popup.win.winfo_rootx(), popup.win.winfo_rooty(),
+                    popup.win.winfo_width(), popup.win.winfo_height())
+    except tk.TclError:
+        rect = None
     with _lock:
         _state["pinned"] = popup.pinned
+        _state["popup_rect"] = rect
     try:
         while True:
             kind, gen, anchor, payload = result_q.get_nowait()
@@ -564,7 +592,7 @@ def make_tray(root, holder):
 
     M = pystray.MenuItem
     menu = pystray.Menu(
-        M("按住 %s 划词 · 点 📌 钉住" % CFG.get("hotkey", "ctrl").capitalize(),
+        M("按住 %s 划词 · 点 📌 钉住" % CFG.get("hotkey", "f2").capitalize(),
           None, enabled=False),
         pystray.Menu.SEPARATOR,
         M(lambda i: "切换为 Google 翻译"
@@ -624,7 +652,7 @@ def main():
 
     make_tray(root, holder)
     print("%s 已启动。按住 %s 指向英文单词即可翻译。"
-          % (APP_NAME, CFG.get("hotkey", "ctrl").capitalize()))
+          % (APP_NAME, CFG.get("hotkey", "f2").capitalize()))
 
     root.after(25, poll, root, holder)
     try:

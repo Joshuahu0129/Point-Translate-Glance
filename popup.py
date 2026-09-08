@@ -23,10 +23,119 @@ def _rgba(hex_color):
     h = hex_color.lstrip("#")
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
 
-# Segoe MDL2 Assets glyphs (present on Windows 10/11)
+# Segoe MDL2 Assets glyphs - fallback only, when Pillow is unavailable.
 IC_PIN = "\uE718"     # Pin
 IC_UNPIN = "\uE77A"   # Unpin
 IC_SPEAK = "\uE767"   # Volume
+
+# Icon buttons (speaker + pin). "Geometric Line" handoff: 24x24 viewBox glyph,
+# rendered 20px inside a 32px square button. config icon_scale tweaks the size.
+IC_BASE = (32, 32, 9)     # square button (w, h, corner radius)
+IC_GLYPH = 21.0 / 32.0    # glyph keyline, px inside the button
+IC_STROKE = 2.5           # stroke in the 24-unit viewBox (heavier than the
+                          # handoff's 1.75 - reads too faint at this size)
+
+# SVG paths from the handoff (viewBox 0 0 24 24).
+_SVG_SPEAK_CONE = ("M13 4.8 L7.6 9.4 H4.4 A1.4 1.4 0 0 0 3 10.8 V13.2 "
+                   "A1.4 1.4 0 0 0 4.4 14.6 H7.6 L13 19.2 Z")
+_SVG_SPEAK_ARCS = ("M16.2 9.4a3.6 3.6 0 0 1 0 5.2", "M18.8 7a7.2 7.2 0 0 1 0 10")
+_SVG_PIN_DOME = ("M10.2 6.2C10.2 10.6 8.8 11.8 6.8 13 5.6 13.7 5 14.3 5 14.9"
+                 "A0.9 0.9 0 0 0 5.9 15.8H18.1a0.9 0.9 0 0 0 0.9-0.9"
+                 "c0-0.6-0.6-1.2-1.8-1.9C15.2 11.8 13.8 10.6 13.8 6.2Z")
+
+_SVG_TOK = re.compile(r"[MmLlHhVvCcAaZz]|-?\d*\.?\d+(?:e-?\d+)?")
+
+
+def _arc_pts(x0, y0, r, fA, fS, x1, y1, n=14):
+    """SVG elliptical-arc (circle only, no rotation) -> sampled points."""
+    dx, dy = x1 - x0, y1 - y0
+    half = math.hypot(dx, dy) / 2.0
+    if half < 1e-6:
+        return [(x1, y1)]
+    r = max(r, half)
+    c = math.sqrt(max(0.0, r * r - half * half))
+    ux, uy = -dy, dx
+    ul = math.hypot(ux, uy) or 1.0
+    sign = 1 if fA != fS else -1
+    cxc = (x0 + x1) / 2.0 + sign * c * ux / ul
+    cyc = (y0 + y1) / 2.0 + sign * c * uy / ul
+    a0 = math.atan2(y0 - cyc, x0 - cxc)
+    a1 = math.atan2(y1 - cyc, x1 - cxc)
+    da = a1 - a0
+    if fS == 0 and da > 0:
+        da -= 2 * math.pi
+    if fS == 1 and da < 0:
+        da += 2 * math.pi
+    return [(cxc + r * math.cos(a0 + da * k / n),
+             cyc + r * math.sin(a0 + da * k / n)) for k in range(1, n + 1)]
+
+
+def _svg_subpaths(dstr):
+    """Very small SVG-path reader: M L H V C A Z (+ relative). Curves/arcs are
+    sampled into points. Returns a list of point lists (one per subpath)."""
+    toks = _SVG_TOK.findall(dstr)
+    i, n = 0, len(toks)
+    subs, cur = [], []
+    x = y = sx = sy = 0.0
+    cmd = "M"
+    while i < n:
+        if toks[i].isalpha():
+            cmd = toks[i]
+            i += 1
+        rel, C = cmd.islower(), cmd.upper()
+
+        def g():
+            nonlocal i
+            v = float(toks[i])
+            i += 1
+            return v
+
+        if C == "M":
+            if cur:
+                subs.append(cur)
+            nx, ny = g(), g()
+            x, y = (x + nx, y + ny) if rel else (nx, ny)
+            sx, sy = x, y
+            cur = [(x, y)]
+            cmd = "l" if rel else "L"
+        elif C == "L":
+            nx, ny = g(), g()
+            x, y = (x + nx, y + ny) if rel else (nx, ny)
+            cur.append((x, y))
+        elif C == "H":
+            nx = g()
+            x = x + nx if rel else nx
+            cur.append((x, y))
+        elif C == "V":
+            ny = g()
+            y = y + ny if rel else ny
+            cur.append((x, y))
+        elif C == "C":
+            x1, y1, x2, y2, nx, ny = (g() for _ in range(6))
+            if rel:
+                x1, y1, x2, y2, nx, ny = (x + x1, y + y1, x + x2, y + y2,
+                                          x + nx, y + ny)
+            for t in (k / 14.0 for k in range(1, 15)):
+                u = 1 - t
+                cur.append((u**3 * x + 3 * u * u * t * x1 + 3 * u * t * t * x2
+                            + t**3 * nx,
+                            u**3 * y + 3 * u * u * t * y1 + 3 * u * t * t * y2
+                            + t**3 * ny))
+            x, y = nx, ny
+        elif C == "A":
+            rx, _ry, _rot, large, sweep, nx, ny = (g() for _ in range(7))
+            if rel:
+                nx, ny = x + nx, y + ny
+            cur.extend(_arc_pts(x, y, rx, int(large), int(sweep), nx, ny))
+            x, y = nx, ny
+        elif C == "Z":
+            cur.append((sx, sy))
+            subs.append(cur)
+            cur = []
+            x, y = sx, sy
+    if cur:
+        subs.append(cur)
+    return subs
 
 LIGHT = {
     "border": "#E4E4E7", "card": "#FFFFFF",
@@ -93,8 +202,9 @@ class Popup:
         self.f_primary = tkfont.Font(family=cjk, size=fs + 1, weight="bold")
         self.f_chip = tkfont.Font(family=cjk, size=fs - 3)
         self.f_pos = tkfont.Font(family="Segoe UI Semibold", size=fs - 3, weight="bold")
-        self.f_sent = tkfont.Font(family="Segoe UI", size=fs - 1)
-        # the Chinese sentence translation reads too faint at regular weight
+        # both the English source line and the Chinese translation are bold
+        self.f_sent = tkfont.Font(family="Segoe UI Semibold", size=fs - 1,
+                                  weight="bold")
         self.f_sent_cn = tkfont.Font(family=cjk, size=fs - 2, weight="bold")
         self.f_sent_b = tkfont.Font(family="Segoe UI Semibold", size=fs - 1, weight="bold")
         self.f_sent_cn_b = tkfont.Font(family=cjk, size=fs - 2, weight="bold")
@@ -102,7 +212,17 @@ class Popup:
         self.f_icon = tkfont.Font(family="Segoe MDL2 Assets", size=fs + 6)
         self.f_name = tkfont.Font(family="Segoe UI", size=fs - 4)
 
-        self.content_w = max(300, int(cfg.get("card_width", 380)))
+        self.card_w_min = max(300, int(cfg.get("card_width", 380)))
+        self.card_w_max = max(self.card_w_min,
+                              int(cfg.get("card_width_max", 560)))
+        self.sent_max_lines = max(3, int(cfg.get("sentence_max_lines", 16)))
+        self.content_w = self.card_w_min
+
+        sc = max(0.4, min(1.4, float(cfg.get("icon_scale", 0.75))))
+        self.ic_w = max(16, round(IC_BASE[0] * sc))
+        self.ic_h = max(14, round(IC_BASE[1] * sc))
+        self.ic_r = max(3, round(IC_BASE[2] * sc))
+        self.ic_stroke = IC_STROKE * max(0.85, sc)
 
         self.win = tk.Toplevel(root)
         self.win.withdraw()
@@ -124,7 +244,7 @@ class Popup:
                                   fg=p["label"], font=self.f_label, anchor="w")
         self.l_primary = tk.Label(self.card, bg=p["card"], fg=p["primary"],
                                   font=self.f_primary, anchor="w", justify="left",
-                                  wraplength=self.content_w)
+                                  wraplength=self.content_w, pady=0)
         self.groups = tk.Frame(self.card, bg=p["card"])
 
         self.sep = tk.Frame(self.card, bg=p["sep"], height=1)
@@ -150,7 +270,7 @@ class Popup:
         self.l_word_wrap = tk.Frame(self.header, bg=p["card"])
         self.l_word_wrap.pack(side="left")
         self.l_word = tk.Label(self.l_word_wrap, bg=p["card"], fg=p["word"],
-                               font=self.f_word)
+                               font=self.f_word, pady=0)
         self.l_word.pack(side="left")
         self.l_phon = tk.Label(self.l_word_wrap, bg=p["card"], fg=p["phon"],
                                font=self.f_phon)
@@ -162,10 +282,10 @@ class Popup:
         # right-side controls: speaker + pin, in rounded weighted chips
         tools = tk.Frame(self.header, bg=p["card"])
         tools.pack(side="right", pady=(2, 0))
-        self.b_speak = self._icon_btn(tools, IC_SPEAK,
+        self.b_speak = self._icon_btn(tools, "speak",
                                       lambda e: self.on_speak(self._word))
-        self.b_pin = self._icon_btn(tools, IC_PIN, self._toggle_pin)
-        self.b_speak.pack(side="left", padx=(0, 5))
+        self.b_pin = self._icon_btn(tools, "pin", self._toggle_pin)
+        self.b_speak.pack(side="left", padx=(0, 4))
         self.b_pin.pack(side="left")
 
     # ---- rounded backgrounds ---------------------------------------
@@ -183,6 +303,59 @@ class Popup:
             self._imgs[key] = img
         return img
 
+    def _icon_img(self, kind, w, h, radius, bg_hex, fg_hex):
+        """Rounded background + a hand-drawn line glyph, as one PhotoImage.
+        kind: "speak" | "pin" | "pin_on". Cached by every visual parameter."""
+        key = ("ico", kind, w, h, radius, bg_hex, fg_hex)
+        img = self._imgs.get(key)
+        if img is None and _PIL:
+            s = 4
+            im = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            d.rounded_rectangle([0, 0, w * s - 1, h * s - 1],
+                                radius=radius * s, fill=_rgba(bg_hex))
+            box = min(w, h) * IC_GLYPH * s
+            self._draw_glyph(d, kind, w * s / 2.0, h * s / 2.0,
+                             box, _rgba(fg_hex), self.ic_stroke)
+            im = im.resize((w, h), Image.LANCZOS)
+            img = ImageTk.PhotoImage(im)
+            self._imgs[key] = img
+        return img
+
+    @staticmethod
+    def _draw_glyph(d, kind, cx, cy, box, rgba, sw):
+        """Render the handoff SVG paths. box = glyph size (px), sw = stroke in
+        24-unit viewBox terms."""
+        k = box / 24.0
+        lw = max(1, int(round(sw * k)))
+
+        def M(pts):
+            return [(cx + (px - 12.0) * k, cy + (py - 12.0) * k)
+                    for px, py in pts]
+
+        if kind == "speak":
+            for sub in _svg_subpaths(_SVG_SPEAK_CONE):
+                d.line(M(sub), fill=rgba, width=lw, joint="curve")
+            for pd in _SVG_SPEAK_ARCS:
+                for sub in _svg_subpaths(pd):
+                    d.line(M(sub), fill=rgba, width=lw, joint="curve")
+        else:
+            solid = kind == "pin_solid"
+            for sub in _svg_subpaths(_SVG_PIN_DOME):
+                if solid:
+                    d.polygon(M(sub), fill=rgba)
+                else:
+                    d.line(M(sub), fill=rgba, width=lw, joint="curve")
+            (rx0, ry0), (rx1, ry1) = M([(8.0, 3.6), (16.0, 6.2)])
+            d.rounded_rectangle([rx0, ry0, rx1, ry1], radius=max(1, int(1.3 * k)),
+                                outline=rgba, width=lw,
+                                fill=(rgba if solid else None))
+            if solid:
+                d.polygon(M([(12.0, 20.6), (11.1, 15.8), (12.9, 15.8)]),
+                          fill=rgba)
+            else:
+                d.line(M([(12.0, 15.8), (12.0, 20.4)]), fill=rgba, width=lw)
+
     def _chip(self, parent, text, font, fg, bg_hex, px, py, radius):
         w = font.measure(text) + px * 2
         h = font.metrics("linespace") + py * 2
@@ -197,24 +370,36 @@ class Popup:
         self._imgrefs.append(img)
         return lbl
 
-    def _icon_btn(self, parent, glyph, cb):
-        p = self.pal
-        W, H, R = 34, 28, 7
-        base = self._round_img(W, H, R, p["icon_bg"])
-        hot = self._round_img(W, H, R, p["icon_hover_bg"])
-        b = tk.Label(parent, text=glyph, font=self.f_icon, fg=p["icon"],
-                     bg=p["card"], cursor="hand2", borderwidth=0)
-        if base is not None:
-            b.config(image=base, compound="center", width=W, height=H)
-            b._imgs = (base, hot)
-            b.bind("<Enter>", lambda e: b.config(image=hot, fg=p["icon_hi"]))
-            b.bind("<Leave>", lambda e: b.config(image=base, fg=p["icon"]))
-        else:
-            b.config(bg=p["icon_bg"], padx=8, pady=5)
-            b.bind("<Enter>", lambda e: b.config(bg=p["icon_hover_bg"], fg=p["icon_hi"]))
-            b.bind("<Leave>", lambda e: b.config(bg=p["icon_bg"], fg=p["icon"]))
+    def _icon_btn(self, parent, kind, cb):
+        b = tk.Label(parent, bg=self.pal["card"], cursor="hand2", borderwidth=0)
+        b._kind = kind          # "speak" | "pin"
+        b._hovered = False
+        self._skin_icon(b)
+        b.bind("<Enter>", lambda e: (setattr(b, "_hovered", True),
+                                     self._skin_icon(b)))
+        b.bind("<Leave>", lambda e: (setattr(b, "_hovered", False),
+                                     self._skin_icon(b)))
         b.bind("<Button-1>", cb)
         return b
+
+    def _skin_icon(self, b):
+        p = self.pal
+        pinned = (b._kind == "pin" and self.pinned)
+        if pinned:
+            bg, fg, kind = p["accent"], "#FFFFFF", "pin_solid"
+        elif b._hovered:
+            bg, fg, kind = p["icon_hover_bg"], p["icon_hi"], b._kind
+        else:
+            bg, fg, kind = p["icon_bg"], p["icon"], b._kind
+        img = self._icon_img(kind, self.ic_w, self.ic_h, self.ic_r, bg, fg)
+        if img is not None:
+            b.config(image=img, text="", width=self.ic_w, height=self.ic_h)
+            b._img = img
+        else:                   # Pillow missing -> MDL2 glyph fallback
+            glyph = {"pin": IC_UNPIN if pinned else IC_PIN,
+                     "speak": IC_SPEAK}[b._kind]
+            b.config(image="", text=glyph, font=self.f_icon,
+                     compound="center", fg=fg, bg=bg, padx=6, pady=4)
 
     # ---- loading dots --------------------------------------------
     def _start_anim(self):
@@ -260,7 +445,8 @@ class Popup:
         t.bind("<B1-Motion>", self._drag_move)
         return t
 
-    def _line_count(self, font, text):
+    def _line_count(self, font, text, width=None):
+        width = width or self.content_w
         n, cur = 1, 0
         for tok in re.findall(r"\s+|\S+", text or ""):
             if "\n" in tok:
@@ -268,15 +454,30 @@ class Popup:
                 cur = 0
                 continue
             w = font.measure(tok)
-            if cur + w > self.content_w and cur > 0:
+            if cur + w > width and cur > 0:
                 n += 1
                 cur = 0 if tok.strip() == "" else w
             else:
                 cur += w
-            while cur > self.content_w:
+            while cur > width:
                 n += 1
-                cur -= self.content_w
+                cur -= width
         return n
+
+    def _target_width(self, data):
+        """Widen the card toward card_width_max when a long sentence would
+        otherwise wrap into many lines - wider reads easier than taller."""
+        base, cap = self.card_w_min, self.card_w_max
+        longest = max((data.get("sentence_en") or "",
+                       data.get("sentence_cn") or "",
+                       data.get("primary") or ""), key=len)
+        if len(longest) < 40:
+            return base
+        rows = self._line_count(self.f_sent, longest, base)
+        if rows <= 3:
+            return base
+        want = int(base * max(1.0, rows / 4.0))   # aim for ~4 rows
+        return max(base, min(cap, want))
 
     # ---- flow layout for chips ------------------------------------
     def _fill_groups(self, pos_groups):
@@ -312,8 +513,12 @@ class Popup:
         widget.insert("1.0", text or "")
         for a, b in spans:
             widget.tag_add("hl", "1.0+%dc" % a, "1.0+%dc" % b)
-        widget.configure(state="disabled",
-                         height=max(1, min(6, self._line_count(widget._font, text))))
+        widget.configure(state="disabled")
+        self._fit_text_height(widget, text)
+
+    def _fit_text_height(self, widget, text):
+        n = self._line_count(widget._font, text)
+        widget.configure(height=max(1, min(self.sent_max_lines, n)))
 
     def _show_word_row(self):
         self._stop_anim()
@@ -333,6 +538,16 @@ class Popup:
         p = self.pal
         self._show_word_row()
         same = (data.get("word") == self._word and self.win.winfo_viewable())
+
+        w = self._target_width(data)
+        if w != self.content_w:
+            self.content_w = w
+            self.l_primary.config(wraplength=w)
+            for t in (self.t_en, self.t_cn):
+                cw = max(1, t._font.measure("0"))
+                t.config(width=max(10, w // cw))
+            same = False                      # width changed -> re-place
+
         self._word = data.get("word", "")
         self.l_word.config(text=self._word)
         phon = data.get("phonetic") or ""
@@ -349,7 +564,7 @@ class Popup:
         primary = data.get("primary") or ""
         if primary:
             self.l_primary.config(text=primary)
-            self.l_primary.pack(fill="x", pady=(9, 0))
+            self.l_primary.pack(fill="x", pady=(0, 0))
 
         groups = data.get("pos_groups") or []
         if groups:
@@ -416,6 +631,8 @@ class Popup:
             y = anchor[1] - h - 26
         x = max(vx, min(x, vx + vw - w))
         y = max(vy, min(y, vy + vh - h))
+        if h > vh:                       # taller than the screen -> pin to top
+            y = vy
         self.win.geometry("+%d+%d" % (int(x), int(y)))
 
     def _apply_region(self):
@@ -449,10 +666,7 @@ class Popup:
             self.win.withdraw()
 
     def _sync_pin(self):
-        self.b_pin.config(text=IC_UNPIN if self.pinned else IC_PIN,
-                          fg=self.pal["accent"] if self.pinned else self.pal["icon"],
-                          bg=self.pal["icon_hover_bg"] if self.pinned
-                          else self.pal["icon_bg"])
+        self._skin_icon(self.b_pin)
 
     def _drag_start(self, e):
         self._drag = (e.x_root, e.y_root,

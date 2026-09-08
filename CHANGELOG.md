@@ -7,6 +7,35 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-08
+
+### 变更
+- **默认热键 Ctrl → F2**。Ctrl 与复制 / Ctrl+单击冲突;换成基本不被占用的 F2。
+  升级时旧配置里的 `hotkey: "ctrl"` 会自动改成 `"f2"`;想用别的键到 `config.json`
+  改(`f2` / `ctrl` / `alt` / `shift`)。
+- **例句英文原句改用粗体**,与已加粗的中文译文一致;高亮词仍靠蓝色区分。
+- **单词标题与主释义之间的行距压到最小**。
+- **喇叭 / 图钉图标重画**为几何线条风格(32px 方形按钮、20px 图标);「已钉住」
+  为填充图钉 + 蓝底。大小可用 `config.json` 的 `icon_scale` 调。
+
+### 新增
+- **卡片自适应大小**:长选区 / 长例句不再截断到 6 行 —— 卡片会先在
+  `card_width` ~ `card_width_max` 之间加宽(换行更好读),再向下增高,最多
+  `sentence_max_lines`(默认 16)行;贴近屏幕底部时整体上移。
+- **指针悬停在卡片上时不再重新查词**,方便把鼠标移上去点 🔊 / 📌,内容不闪。
+- 划词剪贴板探测对所有 `hotkey` 都启用(此前仅 `ctrl`);非 Ctrl 时合成一次干净的
+  Ctrl+C 读取选区。
+
+### 修复
+- 读取 `config.json` 时容忍 BOM(记事本"另存为"会加),此前带 BOM 会导致整个
+  配置被忽略、静默回退默认值。
+
+### 已知限制
+- F2 在文件管理器 / 表格类控件里是「重命名」;按住 F2 划到这类控件上可能触发重命名。
+  换 `hotkey` 或松开即可。
+- `hotkey` 为 `shift` 时,划词探测发送的是 Ctrl+Shift+C(物理 Shift 仍按着);少数
+  应用绑了该组合。用 `use_selection: false` 关闭探测。
+
 ## [1.0.4] - 2026-09-02
 
 翻译从 1–5 秒降到零点几秒。
@@ -87,7 +116,8 @@
 - 圆角用 Win32 窗口区域实现,Windows 10 上无原生投影阴影。
 - 依赖 Windows 英文 OCR 语言包(首次运行会提示安装)。
 
-[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.1...v1.0.2
