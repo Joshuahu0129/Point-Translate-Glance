@@ -9,14 +9,14 @@ import os
 import sys
 
 APP_NAME = "Glance"
-VERSION = "1.0.4"
+VERSION = "1.1.0"
 AUTHOR = "Joshua Hu"
 AUTHOR_TIP = "Made by Joshua Hu"
 VERSION_LINE = "Version %s · by %s" % (VERSION, AUTHOR)
 
 DEFAULT = {
-    # Modifier you hold while pointing at a word: "ctrl" | "alt" | "shift"
-    "hotkey": "ctrl",
+    # Modifier you hold while pointing at a word: "shift" | "ctrl" | "alt"
+    "hotkey": "shift",
     # Target language for online translation (Google language code).
     "target_language": "zh-CN",
     # OCR language / BCP-47 tag. The matching Windows language pack with the
@@ -39,14 +39,22 @@ DEFAULT = {
     "capture_height": 120,
     # UI theme: "light" | "dark"
     "theme": "dark",
-    # Width of the popup card content area, px (grows if the headline needs it).
+    # Popup card content width, px. The card starts at card_width and widens
+    # toward card_width_max when a long sentence would otherwise wrap a lot.
     "card_width": 400,
+    "card_width_max": 560,
+    # A translated sentence stops growing the card after this many lines
+    # (it then just gets clipped with a scrollbarless overflow - rare).
+    "sentence_max_lines": 16,
     # Base font size of the popup.
     "font_size": 12,
     # Popup opacity, 0.85 - 1.0 (1.0 = fully opaque).
     "opacity": 1.0,
     # Corner radius of the popup card, px.
     "corner_radius": 16,
+    # Speaker / pin icon-button size, as a fraction of the 1.0 baseline
+    # (baseline ~= one line of the primary-meaning text).
+    "icon_scale": 1.0,
     # How long the mouse must be still (ms) before a lookup fires.
     "debounce_ms": 70,
     # Keep the card on screen this many ms after the hotkey is released
@@ -102,6 +110,12 @@ def _migrate(cfg):
     # 1.0.4: faster translation - shorter debounce is fine now
     if int(cfg.get("debounce_ms", 0)) >= 120:
         cfg["debounce_ms"] = DEFAULT["debounce_ms"]
+        changed = True
+    # 1.1.0: default modifier moved ctrl -> shift (Ctrl collided with editors'
+    # Ctrl+C / Ctrl+click and with the selection-probe copy). Only rewrite the
+    # value when it is still the old default.
+    if str(cfg.get("hotkey", "")).lower() == "ctrl":
+        cfg["hotkey"] = "shift"
         changed = True
     return changed
 
