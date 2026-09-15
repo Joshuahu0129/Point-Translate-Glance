@@ -14,12 +14,17 @@ import os
 import re
 import sqlite3
 import sys
+import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "glance-dict.db")
 WORD_RE = re.compile(r"^[a-z][a-z .'\-]{0,28}$")
 POS_HINT = re.compile(r"(^|\n)\s*[a-z]{1,6}\.\s", re.I)
 FREQ_MAX = 60000
+
+STARDICT_URL = "https://raw.githubusercontent.com/skywind3000/ECDICT/master/stardict.7z"
+STARDICT_7Z = os.path.join(HERE, "stardict.7z")
+STARDICT_CSV = os.path.join(HERE, "stardict.csv")
 
 
 def find_csv():
@@ -29,6 +34,38 @@ def find_csv():
         if os.path.exists(c):
             return c
     return None
+
+
+def download_csv():
+    """Fetch ECDICT's stardict.7z and extract stardict.csv from it.
+    Needs py7zr (requirements-dev.txt). Returns the path to the extracted CSV."""
+    try:
+        import py7zr
+    except ImportError:
+        sys.exit("需要 py7zr 才能解压 ECDICT 归档:  pip install py7zr\n"
+                 "(已在 requirements-dev.txt 里,跑一遍 setup-dev.bat 也行)")
+
+    print("本地没找到 stardict.csv,从 ECDICT 下载 stardict.7z(约 10MB 压缩包,"
+         "解压后 ~230MB)。")
+    print("raw.githubusercontent.com 在国内经常限速,实测可能要几十分钟 - 正常,"
+         "别以为卡死了。想更快就去 %s 手动下,存成 %s。" % (STARDICT_URL, STARDICT_7Z))
+    try:
+        with urllib.request.urlopen(STARDICT_URL, timeout=180) as r, \
+                open(STARDICT_7Z, "wb") as f:
+            f.write(r.read())
+    except Exception as e:  # noqa: BLE001
+        sys.exit("下载失败: %s\n可以手动下载 %s 放到 %s,或直接传 CSV 路径给本脚本"
+                 % (e, STARDICT_URL, HERE))
+
+    print("解压中...")
+    with py7zr.SevenZipFile(STARDICT_7Z, mode="r") as z:
+        z.extractall(path=HERE)
+    os.remove(STARDICT_7Z)
+
+    if not os.path.exists(STARDICT_CSV):
+        sys.exit("解压后没找到 stardict.csv - ECDICT 的归档内容可能变了,"
+                 "去 %s 手动看一下" % STARDICT_URL)
+    return STARDICT_CSV
 
 
 def _int(s):
@@ -56,7 +93,7 @@ def keep(word, translation, collins, oxford, tag, bnc, frq):
 def main():
     src = sys.argv[1] if len(sys.argv) > 1 else find_csv()
     if not src or not os.path.exists(src):
-        sys.exit("找不到 stardict.csv,请传入路径:  python make_dict.py <csv>")
+        src = download_csv()
 
     if os.path.exists(OUT):
         os.remove(OUT)

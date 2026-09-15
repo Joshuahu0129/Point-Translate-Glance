@@ -8,4 +8,4 @@ Glance bundles third-party data / libraries:
 
 Runtime Python dependencies keep their own licenses (see requirements.txt):
 mss (MIT), pynput (LGPL-3.0), winsdk (MIT), pystray (LGPL-3.0 / GPL-2.0),
-Pillow (MIT-CMU).
+Pillow (MIT-CMU), requests (Apache-2.0).

@@ -7,6 +7,13 @@
 
 ## [Unreleased]
 
+### 修复
+- `make_dict.py`:补回缺失的自动下载逻辑。README / `requirements-dev.txt` 一直
+  说找不到本地 CSV 时会自动下载 ECDICT,但代码里从没实现,只能手动准备 CSV。
+  现在真的会下载 `stardict.7z` 并用 `py7zr` 解压。国内网络到
+  `raw.githubusercontent.com` 常限速,实测约 40 分钟,脚本里已提示别以为卡死。
+- `NOTICE`:补上遗漏的 `requests` 依赖许可证(Apache-2.0)。
+
 ## [1.1.0] - 2026-09-08
 
 ### 变更
