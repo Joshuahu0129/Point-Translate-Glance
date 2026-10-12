@@ -21,6 +21,7 @@ config.json
 # Local-only project docs — kept out of the public repo, backed up to the NAS
 # mirror by sync-to-nas.bat (see KEEP_LOCAL in sync_to_nas.py)
 AGENTS.md
+AGENTS.local.md
 CLAUDE.md
 DECISIONS.md
 .claude/
