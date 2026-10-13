@@ -16,7 +16,7 @@ HERE = pathlib.Path(__file__).parent
 
 # Files that are git-ignored (never pushed to GitHub) but must still be backed
 # up. They are copied into the NAS mirror on every sync.
-KEEP_LOCAL = ["AGENTS.md", "AGENTS.local.md", "CLAUDE.md", "DECISIONS.md"]
+KEEP_LOCAL = ["AGENTS.md", "AGENTS.local.md", "CLAUDE.md", "DECISIONS.md", "ROADMAP.md"]
 
 
 def git(*args, cwd=None):

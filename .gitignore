@@ -22,6 +22,7 @@ config.json
 # mirror by sync-to-nas.bat (see KEEP_LOCAL in sync_to_nas.py)
 AGENTS.md
 AGENTS.local.md
+ROADMAP.md
 CLAUDE.md
 DECISIONS.md
 .claude/
