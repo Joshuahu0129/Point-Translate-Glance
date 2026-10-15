@@ -1,3 +1,13 @@
+---
+title: 版本日志
+answers: 已完成的变更，未发版的记在「Unreleased」
+not: 计划与进度（ROADMAP）、内部重构细节
+sections: Unreleased → 版本号（日期）倒序；每节分新增 / 变更 / 修复
+update: 改动完成时记入「Unreleased」；发版时改为版本号和日期
+store: git
+updated: 2026-10-15
+---
+
 # 更新日志 / Changelog
 
 本文件面向开发者,记录每个版本的改动。遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)
