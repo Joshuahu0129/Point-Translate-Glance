@@ -52,6 +52,16 @@ print("span EN     :", se, "->", sentence[slice(*se[0])] if se else None)
 sp = align_cn(st, list(entry.meanings) if entry else [])
 print("span CN     :", sp, "->", st[slice(*sp[0])] if sp else "(none - best effort)")
 
+# --- exe icon: glance.ico must exist and carry the sizes Windows asks for ---
+import os
+
+from PIL import Image as _Image
+
+_ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "glance.ico")
+_sizes = set(_Image.open(_ico).info.get("sizes", ())) if os.path.exists(_ico) else set()
+icon_ok = {(16, 16), (32, 32), (48, 48), (256, 256)} <= _sizes
+print("glance.ico  :", sorted(_sizes) if icon_ok else "MISSING or incomplete")
+
 # --- double-click-to-copy on the card (word, English line, Chinese line) ---
 import tkinter as tk
 
@@ -101,5 +111,5 @@ print("copied      :", copied)
 copy_ok = copied == [word, sentence, st]
 
 full = "academic outcomes" in sentence and "Others" not in sentence
-print("\nPIPELINE OK" if (word == TARGET and entry and entry.phonetic and full and copy_ok)
+print("\nPIPELINE OK" if (word == TARGET and entry and entry.phonetic and full and copy_ok and icon_ok)
       else "\nCHECK ABOVE (sentence assembly may need tuning)")

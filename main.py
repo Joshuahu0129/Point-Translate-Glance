@@ -37,6 +37,7 @@ except Exception as e:  # noqa: BLE001
     print(e)
     sys.exit(1)
 
+import appicon
 import autostart
 import config as cfg_mod
 import dictionary
@@ -534,25 +535,14 @@ def poll(root, holder):
 
 
 # --- tray -----------------------------------------------------------
-def _tray_icon(Image, ImageDraw):
-    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.rounded_rectangle([4, 4, 60, 60], radius=16, fill=(10, 132, 255, 255))
-    d.arc([15, 13, 49, 51], start=20, end=315, fill="white", width=6)
-    d.line([46, 32, 46, 40], fill="white", width=6)   # stub at the opening
-    d.line([36, 36, 47, 36], fill="white", width=6)   # inward bar of the G
-    return img
-
-
 def make_tray(root, holder):
     try:
         import pystray
-        from PIL import Image, ImageDraw
     except Exception:
         print("未安装 pystray/Pillow, 跳过托盘图标")
         return None
 
-    icon_img = _tray_icon(Image, ImageDraw)
+    icon_img = appicon.render(64)
 
     def rebuild_popup():
         holder["popup"].win.destroy()
