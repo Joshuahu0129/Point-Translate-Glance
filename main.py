@@ -92,8 +92,9 @@ def _clip_get():
 
 
 def _clip_set(text):
+    """Replace the clipboard text. Returns False if the clipboard stayed busy."""
     if not _open_clipboard():
-        return
+        return False
     try:
         _u32.EmptyClipboard()
         if text:
@@ -104,6 +105,7 @@ def _clip_set(text):
             ctypes.memmove(dst, buf, size)
             _k32.GlobalUnlock(h)
             _u32.SetClipboardData(_CF_UNICODETEXT, h)
+        return True
     finally:
         _u32.CloseClipboard()
 
@@ -554,7 +556,8 @@ def make_tray(root, holder):
 
     def rebuild_popup():
         holder["popup"].win.destroy()
-        holder["popup"] = Popup(root, CFG, on_speak=tts.speak, on_pin=set_pinned)
+        holder["popup"] = Popup(root, CFG, on_speak=tts.speak, on_pin=set_pinned,
+                                on_copy=_clip_set)
 
     def toggle_theme(icon, item):
         CFG["theme"] = "light" if CFG.get("theme") == "dark" else "dark"
@@ -625,7 +628,8 @@ def main():
     except Exception:
         pass
 
-    holder = {"popup": Popup(root, CFG, on_speak=tts.speak, on_pin=set_pinned)}
+    holder = {"popup": Popup(root, CFG, on_speak=tts.speak, on_pin=set_pinned,
+                             on_copy=_clip_set)}
 
     if not ocr_available(CFG.get("ocr_language", "en-US")):
         from tkinter import messagebox
