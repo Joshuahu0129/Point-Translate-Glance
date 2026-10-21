@@ -6,7 +6,8 @@ import io
 from PIL import Image, ImageDraw, ImageFont
 
 import dictionary
-from main import align_cn, assemble_sentence, pick_word, spans_in
+from main import (_clip_get, _clip_set, align_cn, assemble_sentence, pick_word,
+                  spans_in)
 from ocr import ocr_png_bytes
 from translate import translate
 
@@ -51,6 +52,64 @@ print("span EN     :", se, "->", sentence[slice(*se[0])] if se else None)
 sp = align_cn(st, list(entry.meanings) if entry else [])
 print("span CN     :", sp, "->", st[slice(*sp[0])] if sp else "(none - best effort)")
 
+# --- exe icon: glance.ico must exist and carry the sizes Windows asks for ---
+import os
+
+from PIL import Image as _Image
+
+_ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "glance.ico")
+_sizes = set(_Image.open(_ico).info.get("sizes", ())) if os.path.exists(_ico) else set()
+icon_ok = {(16, 16), (32, 32), (48, 48), (256, 256)} <= _sizes
+print("glance.ico  :", sorted(_sizes) if icon_ok else "MISSING or incomplete")
+
+# --- double-click-to-copy on the card (word, English line, Chinese line) ---
+import tkinter as tk
+
+import config
+from popup import Popup
+
+# real clipboard round-trip; SKIP when the session may not touch the clipboard
+# (e.g. a sandboxed shell gets ACCESS_DENIED from OpenClipboard)
+saved_clip = _clip_get()
+if _clip_set("glance-selftest"):
+    assert _clip_get() == "glance-selftest", "clipboard round-trip failed"
+    _clip_set(saved_clip or "")
+    print("clipboard   : round-trip OK")
+else:
+    print("clipboard   : SKIP (clipboard not accessible from this session)")
+
+root = tk.Tk()
+root.withdraw()
+copied = []
+
+
+def _dbl(widget):
+    """Tk refuses to synthesize <Double-...>; two quick press/release pairs
+    are recognised as a double-click by the binding system."""
+    for _ in range(2):
+        widget.event_generate("<ButtonPress-1>", x=5, y=5)
+        widget.event_generate("<ButtonRelease-1>", x=5, y=5)
+
+
+card = Popup(root, config.load(), on_copy=lambda t: copied.append(t))
+card.show(None, {"word": word, "phonetic": "x", "pos_groups": [("n.", ["a"])],
+                 "sentence_en": sentence, "sentence_cn": st,
+                 "spans_en": [], "spans_cn": []})
+card.win.update()
+for w in (card.l_word, card.t_en, card.t_cn):
+    _dbl(w)
+    card.win.update()
+card.show(None, {"word": word, "sentence_en": sentence, "_translating": True})
+card.win.update()
+_dbl(card.t_cn)   # "翻译中…" must be ignored
+card.win.update()
+card.show_message(None, "未识别到单词")
+_dbl(card.l_word)  # a message is not a word
+card.win.update()
+root.destroy()
+print("copied      :", copied)
+copy_ok = copied == [word, sentence, st]
+
 full = "academic outcomes" in sentence and "Others" not in sentence
-print("\nPIPELINE OK" if (word == TARGET and entry and entry.phonetic and full)
+print("\nPIPELINE OK" if (word == TARGET and entry and entry.phonetic and full and copy_ok and icon_ok)
       else "\nCHECK ABOVE (sentence assembly may need tuning)")

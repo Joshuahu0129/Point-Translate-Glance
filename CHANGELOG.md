@@ -17,6 +17,16 @@ updated: 2026-10-15
 
 ## [Unreleased]
 
+### 新增
+- **双击卡片复制**:双击标题里的单词复制该词,双击英文例句 / 中文译文复制整句;
+  卡片音标位置会闪一下"已复制 ✓"。需要按住 F2 或先点 📌 钉住才能把鼠标移到卡片上。
+  "翻译中…"占位和错误提示不会被复制。
+
+### 变更
+- **exe / 快捷方式图标换成托盘里的蓝底白 G**(此前是 PyInstaller 默认的软盘图标)。
+  图标由 `appicon.py` 绘制,托盘与 `glance.ico` 共用;改图标后跑 `make_icon.py` 重新生成,
+  `build.bat` 打包时用 `--icon glance.ico` 嵌入。
+
 ### 修复
 - `make_dict.py`:补回缺失的自动下载逻辑。README / `requirements-dev.txt` 一直
   说找不到本地 CSV 时会自动下载 ECDICT,但代码里从没实现,只能手动准备 CSV。

@@ -13,6 +13,7 @@ if exist ".venv\Scripts\pyinstaller.exe" (
 
 %PYI% --noconfirm --clean --onefile --noconsole ^
   --name Glance ^
+  --icon glance.ico ^
   --add-data "glance-dict.db;." ^
   --collect-binaries winsdk ^
   --hidden-import winsdk.windows.media.ocr ^

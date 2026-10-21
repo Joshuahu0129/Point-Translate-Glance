@@ -30,6 +30,7 @@ IC_SPEAK = "\uE767"   # Volume
 
 # Icon buttons (speaker + pin). "Geometric Line" handoff: 24x24 viewBox glyph,
 # rendered 20px inside a 32px square button. config icon_scale tweaks the size.
+_PLACEHOLDER = "翻译中…"   # shown in the CN line while the online sentence is pending
 IC_BASE = (32, 32, 9)     # square button (w, h, corner radius)
 IC_GLYPH = 21.0 / 32.0    # glyph keyline, px inside the button
 IC_STROKE = 2.5           # stroke in the 24-unit viewBox (heavier than the
@@ -176,16 +177,21 @@ def _root_hwnd(win):
 
 
 class Popup:
-    def __init__(self, root, cfg, on_speak=None, on_unpin=None, on_pin=None):
+    def __init__(self, root, cfg, on_speak=None, on_unpin=None, on_pin=None,
+                 on_copy=None):
         self.root = root
         self.cfg = cfg
         self.on_speak = on_speak or (lambda w: None)
+        # on_copy(text) -> False on failure; None/True counts as success
+        self.on_copy = on_copy or (lambda text: True)
         self.on_unpin = on_unpin or (lambda: None)
         self.on_pin = on_pin or (lambda pinned: None)
         self.pal = DARK if str(cfg.get("theme", "light")).lower() == "dark" else LIGHT
         self.radius = int(cfg.get("corner_radius", 16))
         self.pinned = False
         self._word = ""
+        self._phon_text = ""     # what l_phon shows when no "copied" flash is up
+        self._flash_job = None
         self._drag = None
         self._imgs = {}          # rounded-rect PhotoImage cache
         self._imgrefs = []       # keep per-chip images alive
@@ -272,6 +278,7 @@ class Popup:
         self.l_word = tk.Label(self.l_word_wrap, bg=p["card"], fg=p["word"],
                                font=self.f_word, pady=0)
         self.l_word.pack(side="left")
+        self.l_word.bind("<Double-Button-1>", lambda e: self._copy(self._word))
         self.l_phon = tk.Label(self.l_word_wrap, bg=p["card"], fg=p["phon"],
                                font=self.f_phon)
         self.l_phon.pack(side="left", padx=(8, 0), pady=(6, 0))
@@ -443,6 +450,9 @@ class Popup:
         t._font = font
         t.bind("<ButtonPress-1>", self._drag_start)
         t.bind("<B1-Motion>", self._drag_move)
+        # double-click copies the whole line; "break" stops Tk's default
+        # select-one-word behaviour on a double-click
+        t.bind("<Double-Button-1>", lambda e, w=t: (self._copy_text(w), "break")[1])
         return t
 
     def _line_count(self, font, text, width=None):
@@ -551,7 +561,7 @@ class Popup:
         self._word = data.get("word", "")
         self.l_word.config(text=self._word)
         phon = data.get("phonetic") or ""
-        self.l_phon.config(text=("/%s/" % phon) if phon else "")
+        self._set_phon(("/%s/" % phon) if phon else "")
 
         self.l_section.pack_forget()
         self.l_primary.pack_forget()
@@ -581,7 +591,7 @@ class Popup:
                 self._set_sentence(self.t_cn, cn, data.get("spans_cn") or [])
                 self.t_cn.pack(fill="x", pady=(3, 0))
             elif data.get("_translating"):
-                self._set_sentence(self.t_cn, "翻译中…", [])
+                self._set_sentence(self.t_cn, _PLACEHOLDER, [])
                 self.t_cn.pack(fill="x", pady=(3, 0))
 
         self.l_name.pack(anchor="e", pady=(9, 0))
@@ -606,7 +616,7 @@ class Popup:
         self._show_word_row()
         self._word = ""
         self.l_word.config(text=text)
-        self.l_phon.config(text="")
+        self._set_phon("")
         for w in (self.l_section, self.l_primary, self.groups, self.sep,
                   self.t_en, self.t_cn, self.l_name):
             w.pack_forget()
@@ -655,6 +665,32 @@ class Popup:
         self._sync_pin()
         self._stop_anim()
         self.win.withdraw()
+
+    # ---- copy on double-click ----------------------------------
+    def _set_phon(self, text):
+        self._phon_text = text
+        self.l_phon.config(text=text, fg=self.pal["phon"])
+
+    def _copy_text(self, widget):
+        text = widget.get("1.0", "end-1c").strip()
+        if text and text != _PLACEHOLDER:
+            self._copy(text)
+
+    def _copy(self, text):
+        """Put text on the clipboard and flash the result in the header."""
+        text = (text or "").strip()
+        if not text:
+            return
+        ok = self.on_copy(text) is not False
+        if self._flash_job:
+            self.root.after_cancel(self._flash_job)
+        self.l_phon.config(text="已复制 ✓" if ok else "复制失败",
+                           fg=self.pal["accent"] if ok else self.pal["label"])
+        self._flash_job = self.root.after(900, self._end_flash)
+
+    def _end_flash(self):
+        self._flash_job = None
+        self.l_phon.config(text=self._phon_text, fg=self.pal["phon"])
 
     # ---- pin / drag ------------------------------------
     def _toggle_pin(self, _=None):
