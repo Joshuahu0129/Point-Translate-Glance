@@ -2,6 +2,7 @@
 -> assemble sentence -> dictionary -> sentence translation -> alignment."""
 
 import io
+import re
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -110,6 +111,81 @@ root.destroy()
 print("copied      :", copied)
 copy_ok = copied == [word, sentence, st]
 
+# --- Chinese selection -> English pasted after it ---
+import main as _m
+from pynput import keyboard as _kb
+
+zh_ok = True
+
+
+def _check(name, cond):
+    global zh_ok
+    if not cond:
+        zh_ok = False
+        print("zh->en FAIL :", name)
+
+
+_hr = _m.han_ratio
+_check("all Han", _hr("今天天气很好") == 1.0)
+_check("mostly English is not Chinese", _hr("你好 hello world") <= 0.5)
+_check("exactly 50% is not over 50%", _hr("你好ab") == 0.5 and not _hr("你好ab") > 0.5)
+_check("just over 50%", _hr("你好a") > 0.5)
+_check("whitespace ignored", _hr(" 你 好 " + chr(10)) == 1.0)
+_check("empty / punctuation only", _hr("") == 0.0 and _hr("，。！") == 0.0)
+_check("digits count against", _hr("今天是 2026 年") == 0.5)
+_CRLF = chr(13) + chr(10)
+_check("compose", _m.compose_insert("你好", "Hi") == "你好 Hi")
+_check("compose keeps trailing newline",
+       _m.compose_insert("你好。" + _CRLF, "Hello.") == "你好。 Hello." + _CRLF)
+
+_zh = "今天天气很好，我们去公园散步吧。"
+_out = _m.zh_to_en_text(_zh)
+print("zh->en      :", _out)
+_en_part = _out[len(_zh):]
+_check("original kept + English appended",
+       _out.startswith(_zh + " ") and re.search(r"[A-Za-z]{3}", _en_part)
+       and not _m._HAN.search(_en_part))
+try:
+    _m.zh_to_en_text("好" * 401)
+    _check("too long is rejected", False)
+except ValueError:
+    pass
+
+# release-then-paste state logic, with a fake pasting function
+_calls = []
+_real_start = _m._start_insert
+_m._start_insert = _calls.append
+_hk = next(iter(_m.hotkey_keys()))
+_S = _m._state
+
+
+def _reset(**kw):
+    with _m._lock:
+        _S.update(dict(held=False, gen=0, pending_insert=None, inserting=False), **kw)
+
+
+_reset(held=True, gen=7)
+_m.deliver_insert(7, "T")
+_check("held -> waits", not _calls and _S["pending_insert"] == (7, "T"))
+_m.on_release(_hk)
+_check("release -> pastes once", _calls == ["T"] and _S["inserting"]
+       and _S["pending_insert"] is None)
+_reset(held=True, gen=8, pending_insert=(7, "old"))
+_m.on_release(_hk)
+_check("stale generation is dropped", _calls == ["T"])
+_reset(held=False, gen=9)
+_m.deliver_insert(9, "now")
+_check("already released -> pastes now", _calls == ["T", "now"])
+_reset(held=False, gen=10)
+_m.deliver_insert(9, "superseded")
+_check("superseded lookup never pastes", _calls == ["T", "now"])
+_reset(held=True, gen=11, inserting=True)
+_m.on_release(_hk)
+_check("echo of our own keys ignored", _S["held"] is True)
+_reset()
+_m._start_insert = _real_start
+print("zh->en logic:", "OK" if zh_ok else "FAILED")
+
 full = "academic outcomes" in sentence and "Others" not in sentence
-print("\nPIPELINE OK" if (word == TARGET and entry and entry.phonetic and full and copy_ok and icon_ok)
+print("\nPIPELINE OK" if (word == TARGET and entry and entry.phonetic and full and copy_ok and icon_ok and zh_ok)
       else "\nCHECK ABOVE (sentence assembly may need tuning)")

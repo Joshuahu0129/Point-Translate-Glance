@@ -66,6 +66,11 @@ DEFAULT = {
     # selection as the sentence. Uses a quick Ctrl+C behind the scenes; turn
     # off if it interferes with an app that copies on empty selection.
     "use_selection": True,
+    # Chinese text selected (more than half Han characters) + hotkey ->
+    # translate it to English and paste it right after the selection instead
+    # of showing a card. Needs use_selection (it reads the selection the same
+    # way); set false to turn it off.
+    "zh_to_en": True,
 }
 
 
