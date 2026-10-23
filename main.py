@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
@@ -175,22 +176,64 @@ def han_ratio(text):
     return len(_HAN.findall(chars)) / len(chars)
 
 
+ZH_MAX_LINES = 30
+_LINE_SPLIT = re.compile(r"\r\n|\r|\n")
+_END_MARKS = "。．.！!？?…；;，,、：:"
+_TRAIL_PUNCT = re.compile(r"[.!?;:,…。！？，]+$")
+
+
+def _newline_of(text):
+    for nl in ("\r\n", "\n", "\r"):
+        if nl in text:
+            return nl
+    return "\n"
+
+
+def mirror_end(src, en):
+    """Don't add end punctuation the source line doesn't have (translation
+    engines love to append '.' / '?')."""
+    s = src.rstrip()
+    if s and s[-1] not in _END_MARKS:
+        return _TRAIL_PUNCT.sub("", en.rstrip())
+    return en
+
+
 def compose_insert(raw, en):
-    """Selection + ' ' + English, keeping any trailing newline where it was
-    (Word selects whole paragraphs including the paragraph mark)."""
+    """Selection followed by its English: after a space on the same line when
+    the selection is one line, else on new lines below (en then has one line
+    per source line). A trailing newline stays last (Word selects whole
+    paragraphs including the paragraph mark)."""
     head = raw.rstrip()
-    return head + " " + en + raw[len(head):]
+    sep = _newline_of(head) if _LINE_SPLIT.search(head) else " "
+    return head + sep + en + raw[len(head):]
 
 
 def zh_to_en_text(raw):
     """Chinese selection -> the text to paste over it (original + English).
-    Raises ValueError (too long) or TranslateError."""
+    Each non-empty line is translated on its own so the line structure
+    survives; blank lines are kept in place. Raises ValueError (too long /
+    too many lines) or TranslateError."""
     head = raw.strip()
     if len(head) > ZH_MAX:
         raise ValueError("选区过长(最多 %d 字)" % ZH_MAX)
+    src = [ln.strip() for ln in _LINE_SPLIT.split(head)]
+    todo = [ln for ln in src if ln]
+    if len(todo) > ZH_MAX_LINES:
+        raise ValueError("行数过多(最多 %d 行)" % ZH_MAX_LINES)
     order = tuple(CFG.get("engine_order", ["google", "mymemory"]))
-    en, _ = translate(head, "en", order, source_language="zh-CN")
-    return compose_insert(raw, re.sub(r"\s+", " ", en).strip())
+
+    def one(line):
+        en, _ = translate(line, "en", order, source_language="zh-CN")
+        return mirror_end(line, re.sub(r"\s+", " ", en).strip())
+
+    if len(todo) > 1:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            done = list(pool.map(one, todo))
+    else:
+        done = [one(todo[0])]
+    it = iter(done)
+    out = [next(it) if ln else "" for ln in src]
+    return compose_insert(raw, _newline_of(head).join(out))
 
 
 def _insert_text(text):
