@@ -5,7 +5,7 @@ not: 计划与进度（ROADMAP）、内部重构细节
 sections: Unreleased → 版本号（日期）倒序；每节分新增 / 变更 / 修复
 update: 改动完成时记入「Unreleased」；发版时改为版本号和日期
 store: git
-updated: 2026-10-15
+updated: 2026-10-23
 ---
 
 # 更新日志 / Changelog
@@ -16,6 +16,8 @@ updated: 2026-10-15
 版本号在 `config.py` 的 `VERSION` 常量里,发布时改这里 + 打 tag `vX.Y.Z`。
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-10-23
 
 ### 新增
 - **中文选区一键译成英文并贴回**:选中一段中文(汉字超过一半),按热键(默认 F2)
@@ -38,6 +40,11 @@ updated: 2026-10-15
   现在真的会下载 `stardict.7z` 并用 `py7zr` 解压。国内网络到
   `raw.githubusercontent.com` 常限速,实测约 40 分钟,脚本里已提示别以为卡死。
 - `NOTICE`:补上遗漏的 `requests` 依赖许可证(Apache-2.0)。
+
+### 已知限制
+- 中译英靠模拟 Ctrl+V 写入,网页 / PDF 等只读区域贴不进去,不会有任何反应;选区内的
+  加粗、链接、图片会被纯文本覆盖。
+- 取词探测与中译英写入只保存 / 恢复剪贴板里的文字,剪贴板里是图片或文件时会被清空。
 
 ## [1.1.0] - 2026-09-08
 
@@ -148,7 +155,8 @@ updated: 2026-10-15
 - 圆角用 Win32 窗口区域实现,Windows 10 上无原生投影阴影。
 - 依赖 Windows 英文 OCR 语言包(首次运行会提示安装)。
 
-[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.2...v1.0.3

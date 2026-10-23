@@ -9,7 +9,7 @@ import os
 import sys
 
 APP_NAME = "Glance"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 AUTHOR = "Joshua Hu"
 AUTHOR_TIP = "Made by Joshua Hu"
 VERSION_LINE = "Version %s · by %s" % (VERSION, AUTHOR)
