@@ -140,6 +140,7 @@ def _selection_probe_begin():
 
 
 def _selection_probe_end(saved):
+    """Restore the clipboard; return the raw selected text ('' if none)."""
     if saved is False:
         return ""
     try:
@@ -147,12 +148,87 @@ def _selection_probe_end(saved):
         cur = _clip_get()
         _clip_set(saved or "")
         if cur and cur != _SENTINEL and cur.strip():
-            t = re.sub(r"\s+", " ", cur).strip()
-            if 2 <= len(t) <= 400 and re.search(r"[A-Za-z]", t):
-                return t
+            return cur
     except Exception:  # noqa: BLE001
         pass
     return ""
+
+
+def _english_selection(raw):
+    """The selection as a one-line English sentence, or '' if it isn't one."""
+    t = re.sub(r"\s+", " ", raw or "").strip()
+    if 2 <= len(t) <= 400 and re.search(r"[A-Za-z]", t):
+        return t
+    return ""
+
+
+# --- Chinese selection -> English pasted after it ---------------------------
+_HAN = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")  # Han + ext A + compat
+ZH_RATIO = 0.5       # strictly more than this share of non-space chars = Chinese
+ZH_MAX = 400
+
+
+def han_ratio(text):
+    chars = re.sub(r"\s+", "", text or "")
+    if not chars:
+        return 0.0
+    return len(_HAN.findall(chars)) / len(chars)
+
+
+def compose_insert(raw, en):
+    """Selection + ' ' + English, keeping any trailing newline where it was
+    (Word selects whole paragraphs including the paragraph mark)."""
+    head = raw.rstrip()
+    return head + " " + en + raw[len(head):]
+
+
+def zh_to_en_text(raw):
+    """Chinese selection -> the text to paste over it (original + English).
+    Raises ValueError (too long) or TranslateError."""
+    head = raw.strip()
+    if len(head) > ZH_MAX:
+        raise ValueError("选区过长(最多 %d 字)" % ZH_MAX)
+    order = tuple(CFG.get("engine_order", ["google", "mymemory"]))
+    en, _ = translate(head, "en", order, source_language="zh-CN")
+    return compose_insert(raw, re.sub(r"\s+", " ", en).strip())
+
+
+def _insert_text(text):
+    """Paste text over the current selection via the clipboard, then put the
+    clipboard back. Replacing (not arrow-key + paste) means a read-only page
+    or PDF just ignores it instead of scrolling / turning a page."""
+    saved = _clip_get()
+    try:
+        if not _clip_set(text):
+            return
+        time.sleep(0.03)
+        _kbd.press(keyboard.Key.ctrl)
+        _kbd.press("v")
+        _kbd.release("v")
+        _kbd.release(keyboard.Key.ctrl)
+        time.sleep(0.35)         # let the target app read it before we restore
+    finally:
+        _clip_set(saved or "")
+        with _lock:
+            _state["inserting"] = False
+
+
+def _start_insert(text):
+    threading.Thread(target=_insert_text, args=(text,), daemon=True).start()
+
+
+def deliver_insert(gen, text):
+    """Paste now if the hotkey is already up, else when it is released: a
+    synthesized Ctrl+V on top of a physically held Ctrl/Alt/Shift is a
+    different shortcut."""
+    with _lock:
+        if gen != _state["gen"]:
+            return
+        if _state["held"]:
+            _state["pending_insert"] = (gen, text)
+            return
+        _state["inserting"] = True
+    _start_insert(text)
 
 CFG = cfg_mod.load()
 
@@ -174,7 +250,9 @@ job_q = queue.Queue()
 result_q = queue.Queue()
 _lock = threading.Lock()
 _state = {"held": False, "gen": 0, "last_move": 0.0, "released_at": 0.0,
-          "pinned": False, "popup_rect": None}
+          "pinned": False, "popup_rect": None,
+          "pending_insert": None,   # (gen, text) waiting for the hotkey release
+          "inserting": False}       # our own synthesized keys are in flight
 
 mouse_ctl = mouse.Controller()
 _PUNCT = "".join(set(string.punctuation) | {"“", "”", "‘", "’", "—", "…", "·", "，", "。"})
@@ -213,19 +291,29 @@ def request_translation():
 def on_press(key):
     if key in hotkey_keys():
         with _lock:
-            if _state["held"]:
+            if _state["held"] or _state["inserting"]:
                 return
             _state["held"] = True
+            _state["pending_insert"] = None
         request_translation()
 
 
 def on_release(key):
     if key in hotkey_keys():
+        paste = None
         with _lock:
+            if _state["inserting"]:       # echo of our own synthesized Ctrl
+                return
             _state["held"] = False
             _state["released_at"] = time.time()
+            pend, _state["pending_insert"] = _state["pending_insert"], None
+            if pend and pend[0] == _state["gen"]:
+                _state["inserting"] = True
+                paste = pend[1]
         if int(CFG.get("linger_ms", 500)) <= 0:
             result_q.put(("hide", None, None, None))
+        if paste is not None:
+            _start_insert(paste)
 
 
 def on_move(x, y):
@@ -393,6 +481,15 @@ def worker_loop():
         if data is None:
             result_q.put(("none", gen, (x, y), None))
             continue
+        if "_zh_src" in data:
+            try:
+                text = zh_to_en_text(data["_zh_src"])
+            except (TranslateError, ValueError) as e:
+                result_q.put(("error", gen, (x, y), "中译英失败: %s" % e))
+                continue
+            result_q.put(("hide", gen, (x, y), None))
+            deliver_insert(gen, text)
+            continue
         # stage 1: word + phonetics + POS + the original sentence, right away
         result_q.put(("show", gen, (x, y), data))
         # stage 2: the online translation streams in
@@ -424,7 +521,10 @@ def do_lookup_fast(sct, x, y):
     png = mss.tools.to_png(shot.rgb, shot.size)
     lines = ocr_png_bytes(png, CFG.get("ocr_language", "en-US"))
     word, cur_line = pick_word(lines, x - left, y - top)
-    selection = _selection_probe_end(_sel_saved)
+    raw_sel = _selection_probe_end(_sel_saved)
+    if CFG.get("zh_to_en", True) and han_ratio(raw_sel) > ZH_RATIO:
+        return {"_zh_src": raw_sel}, None
+    selection = _english_selection(raw_sel)
 
     if not word or not re.search(r"[A-Za-z]", word):
         if selection:
