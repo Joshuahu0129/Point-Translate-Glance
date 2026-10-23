@@ -17,6 +17,8 @@ updated: 2026-10-23
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-23
+
 ### 变更
 - **中译英保留原来的行结构,且不加标点**:选区是多行时,逐行翻译,原文原样保留,英文按
   行对应排在原文下面(空行也保留);单行选区仍是"原文 + 空格 + 英文"。某一行中文末尾没有
@@ -161,7 +163,8 @@ updated: 2026-10-23
 - 圆角用 Win32 窗口区域实现,Windows 10 上无原生投影阴影。
 - 依赖 Windows 英文 OCR 语言包(首次运行会提示安装)。
 
-[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/Joshuahu0129/Point-Translate-Glance/compare/v1.0.3...v1.0.4
