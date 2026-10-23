@@ -75,6 +75,7 @@ python make_dict.py        REM 下载 ECDICT stardict.7z 并生成常用词子�
 | `tts.py` | 朗读单词 | **是**(Win) |
 | `autostart.py` | 开机自启(注册表 Run 键) | **是**(Win) |
 | `config.py` | 配置 + 版本号 | 否 |
+| `appicon.py` / `make_icon.py` | 图标绘制 / 生成 `glance.ico`(开发用) | 否 |
 | `make_dict.py` | 构建 `glance-dict.db`(开发用) | 否 |
 
 Mac 版计划见 [docs/PORTING-MAC.md](docs/PORTING-MAC.md)。
