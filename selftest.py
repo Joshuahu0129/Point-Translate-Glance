@@ -150,6 +150,40 @@ try:
     _check("too long is rejected", False)
 except ValueError:
     pass
+try:
+    _m.zh_to_en_text("\n".join(["好"] * 31))
+    _check("too many lines is rejected", False)
+except ValueError:
+    pass
+
+# multi-line selections keep their line structure; no punctuation is added
+_mirror = _m.mirror_end
+_check("no end mark in source -> none added",
+       _mirror("我发给你的信息看到了吗", "Have you seen the message I sent you?")
+       == "Have you seen the message I sent you")
+_check("source end mark -> kept", _mirror("真的吗？", "Really?") == "Really?"
+       and _mirror("你好。", "Hello.") == "Hello.")
+_check("ellipsis stripped too", _mirror("等一下", "Wait a minute...") == "Wait a minute")
+_check("compose multi-line",
+       _m.compose_insert("甲\n乙", "A\nB") == "甲\n乙\nA\nB"
+       and _m.compose_insert("甲" + _CRLF + "乙", "A" + _CRLF + "B")
+       == "甲" + _CRLF + "乙" + _CRLF + "A" + _CRLF + "B")
+
+_ml = "我发给你的信息看到了吗\n记得回复我"      # the screenshot case
+_out = _m.zh_to_en_text(_ml)
+print("zh->en (2 lines):", repr(_out))
+_ln = _out.split("\n")
+_check("2 lines in -> 4 lines out", len(_ln) == 4)
+_check("Chinese part untouched", _ln[:2] == ["我发给你的信息看到了吗", "记得回复我"])
+_check("each English line on its own line, no end punctuation",
+       len(_ln) == 4 and all(re.search(r"[A-Za-z]{3}", x) and not _m._HAN.search(x)
+                             and x[-1] not in ".?!" for x in _ln[2:]))
+
+_out = _m.zh_to_en_text("你好\r\n\r\n谢谢" + _CRLF)           # blank line + CRLF + trailing newline
+_ln = _out.split(_CRLF)
+_check("blank line kept, CRLF kept, trailing newline last",
+       len(_ln) == 7 and _ln[:3] == ["你好", "", "谢谢"] and _ln[4] == ""
+       and _ln[3] and _ln[5] and _ln[6] == "")
 
 # release-then-paste state logic, with a fake pasting function
 _calls = []
