@@ -78,6 +78,8 @@ python make_dict.py        REM 下载 ECDICT stardict.7z 并生成常用词子�
 | `appicon.py` / `make_icon.py` | 图标绘制 / 生成 `glance.ico`(开发用) | 否 |
 | `make_dict.py` | 构建 `glance-dict.db`(开发用) | 否 |
 
+整体框架、线程分工和必须守住的约束见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+
 Mac 版计划见 [docs/PORTING-MAC.md](docs/PORTING-MAC.md)。
 
 ## 配置(config.json)
