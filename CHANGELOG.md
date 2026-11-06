@@ -1,11 +1,10 @@
 ---
-title: 版本日志
-answers: 已完成的变更，未发版的记在「Unreleased」
-not: 计划与进度（ROADMAP）、内部重构细节
-sections: Unreleased → 版本号（日期）倒序；每节分新增 / 变更 / 修复
-update: 改动完成时记入「Unreleased」；发版时改为版本号和日期
-store: git
-updated: 2026-10-23
+名称 name      : changelog
+标题 title     : 版本日志
+用途 purpose   : 服务于回溯版本变化，给新问题归因和诊断；未发版的记在「Unreleased」
+章节 sections  : Unreleased → 版本号（日期）倒序；每节分新增 / 变更 / 修复
+范围 scope     : 不含计划与进度（ROADMAP）、内部重构细节
+更新 updated   : 2026-11-06
 ---
 
 # 更新日志 / Changelog
